@@ -1,0 +1,35 @@
+{
+  "name": "slop-radar",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Chrome extension that labels LinkedIn posts as human or AI slop, powered by Jev.",
+  "type": "module",
+  "license": "MIT",
+  "author": "Aakash Pahuja",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/dgr8akki/slop-radar.git"
+  },
+  "bugs": "https://github.com/dgr8akki/slop-radar/issues",
+  "homepage": "https://github.com/dgr8akki/slop-radar#readme",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "test": "node --test test/*.test.js",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "check": "npm run lint && npm run format:check && npm test",
+    "eval": "node --env-file-if-exists=.env evals/rating.eval.js",
+    "icons": "node scripts/render-icons.js",
+    "package": "node scripts/package.js"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "eslint": "^10.11.0",
+    "globals": "^17.12.0",
+    "jsdom": "^30.1.1",
+    "prettier": "^3.9.9"
+  }
+}
