@@ -1,0 +1,49 @@
+/* Slop Radar labels on LinkedIn posts. Muted, earthy verdict colors: a calm note, not an alarm. */
+
+.slop-radar-post {
+  --slop-radar-color: #6b7079;
+  position: relative;
+  outline: 2px solid var(--slop-radar-color) !important;
+  outline-offset: -2px;
+}
+
+.slop-radar-post[data-slop-radar='human'] {
+  --slop-radar-color: #2f7d4f;
+}
+
+.slop-radar-post[data-slop-radar='slop'] {
+  --slop-radar-color: #b3261e;
+}
+
+.slop-radar-post[data-slop-radar='unclear'] {
+  --slop-radar-color: #8a5a0f;
+}
+
+.slop-radar-post[data-slop-radar='pending'],
+.slop-radar-post[data-slop-radar='error'] {
+  --slop-radar-color: #6b7079;
+  outline-style: dashed !important;
+}
+
+.slop-radar-badge {
+  position: absolute;
+  top: 8px;
+  right: 48px;
+  z-index: 5;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--slop-radar-color);
+  color: #ffffff;
+  font:
+    600 11px/1.6 system-ui,
+    -apple-system,
+    'Segoe UI',
+    Roboto,
+    sans-serif;
+  cursor: help;
+}
+
+.slop-radar-badge:focus-visible {
+  outline: 2px solid var(--slop-radar-color);
+  outline-offset: 2px;
+}
