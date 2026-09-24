@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Slop Radar</title>
+    <link rel="stylesheet" href="popup.css" />
+    <script type="module" src="popup.js"></script>
+  </head>
+  <body>
+    <header class="brand">
+      <img src="../icons/icon-32.png" width="20" height="20" alt="" />
+      <h1>Slop Radar</h1>
+    </header>
+
+    <p class="intro">Labels LinkedIn posts as you scroll, by how much they read like generic AI writing.</p>
+
+    <ul class="legend" aria-label="What the labels mean">
+      <li><span class="badge human">Human</span> Specific, first-hand, written by a person</li>
+      <li><span class="badge unclear">Unclear</span> Could go either way</li>
+      <li><span class="badge slop">AI slop</span> Formulaic hooks, stock phrases, engagement bait</li>
+    </ul>
+    <p class="hint">Hover or focus a label to see why.</p>
+
+    <form id="key-form" class="field">
+      <label for="api-key">AI Gateway API key</label>
+      <div class="row">
+        <input id="api-key" type="password" autocomplete="off" spellcheck="false" placeholder="vck_…" />
+        <button type="submit">Save</button>
+      </div>
+      <p id="key-status" class="hint" role="status">
+        Stored only in this browser. Sent only to <span class="nowrap">ai-gateway.vercel.sh</span>.
+      </p>
+    </form>
+  </body>
+</html>
