@@ -1,0 +1,171 @@
+/* Slop Radar popup: the legend is the content; settings stay small underneath. */
+
+:root {
+  color-scheme: light dark;
+
+  --bg: #ffffff;
+  --ink: #202124;
+  --muted: #5f6368;
+  --line: #e0e2e6;
+  --field: #ffffff;
+  --focus: #2f5da8;
+  --ok: #2f7d4f;
+  --danger: #b3261e;
+
+  --human: #2f7d4f;
+  --unclear: #8a5a0f;
+  --slop: #b3261e;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #1d1f23;
+    --ink: #e8eaed;
+    --muted: #a3a8b0;
+    --line: #34373d;
+    --field: #25282d;
+    --focus: #8ab4f8;
+    --ok: #7cc79b;
+    --danger: #f28b82;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  width: 320px;
+  margin: 0;
+  padding: 16px;
+  display: grid;
+  gap: 12px;
+  background: var(--bg);
+  color: var(--ink);
+  font:
+    13px/1.5 system-ui,
+    -apple-system,
+    'Segoe UI',
+    Roboto,
+    sans-serif;
+}
+
+h1,
+p,
+ul {
+  margin: 0;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.brand h1 {
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.intro {
+  color: var(--muted);
+}
+
+.legend {
+  display: grid;
+  gap: 8px;
+  padding: 0;
+  list-style: none;
+}
+
+.legend li {
+  display: grid;
+  grid-template-columns: 64px 1fr;
+  align-items: center;
+  gap: 10px;
+}
+
+.badge {
+  justify-self: start;
+  padding: 1px 8px;
+  border-radius: 999px;
+  color: #ffffff;
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.badge.human {
+  background: var(--human);
+}
+
+.badge.unclear {
+  background: var(--unclear);
+}
+
+.badge.slop {
+  background: var(--slop);
+}
+
+.hint {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.field {
+  display: grid;
+  gap: 6px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+
+.field label {
+  font-weight: 500;
+}
+
+.row {
+  display: flex;
+  gap: 8px;
+}
+
+input,
+button {
+  font: inherit;
+  color: inherit;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+}
+
+input {
+  flex: 1;
+  min-width: 0;
+  padding: 6px 8px;
+  background: var(--field);
+}
+
+button {
+  padding: 6px 12px;
+  background: var(--field);
+  cursor: pointer;
+}
+
+button:hover {
+  border-color: var(--muted);
+}
+
+:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.nowrap {
+  white-space: nowrap;
+}
+
+.status-ok {
+  color: var(--ok);
+}
+
+.status-error {
+  color: var(--danger);
+}
