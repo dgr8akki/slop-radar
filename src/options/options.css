@@ -1,0 +1,261 @@
+/* Settings page: one card, room to explain where the key comes from. */
+
+:root {
+  color-scheme: light dark;
+
+  --bg: #f6f7f9;
+  --card: #ffffff;
+  --ink: #202124;
+  --muted: #5f6368;
+  --line: #e0e2e6;
+  --field: #ffffff;
+  --focus: #2f5da8;
+  --accent: #2f5da8;
+  --on-accent: #ffffff;
+  --ok: #2f7d4f;
+  --danger: #b3261e;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #16181c;
+    --card: #1d1f23;
+    --ink: #e8eaed;
+    --muted: #a3a8b0;
+    --line: #34373d;
+    --field: #25282d;
+    --focus: #8ab4f8;
+    --accent: #8ab4f8;
+    --on-accent: #10141a;
+    --ok: #7cc79b;
+    --danger: #f28b82;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+[hidden] {
+  display: none !important;
+}
+
+body {
+  margin: 0;
+  padding: 48px 16px;
+  background: var(--bg);
+  color: var(--ink);
+  font:
+    14px/1.55 system-ui,
+    -apple-system,
+    'Segoe UI',
+    Roboto,
+    sans-serif;
+}
+
+main {
+  max-width: 560px;
+  margin: 0 auto;
+  display: grid;
+  gap: 20px;
+}
+
+h1,
+h2,
+p {
+  margin: 0;
+}
+
+h1 {
+  font-size: 20px;
+}
+
+h2 {
+  font-size: 16px;
+}
+
+a {
+  color: var(--accent);
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.card {
+  display: grid;
+  gap: 14px;
+  padding: 20px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--card);
+}
+
+.muted {
+  color: var(--muted);
+}
+
+.small {
+  font-size: 12px;
+}
+
+.providers {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin: 0 0 8px;
+  padding: 0;
+  border: 0;
+}
+
+.providers legend {
+  margin-bottom: 6px;
+  padding: 0;
+  font-weight: 500;
+}
+
+.option {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  font-weight: 400;
+  cursor: pointer;
+}
+
+.option:has(:checked) {
+  border-color: var(--accent);
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+
+.option input {
+  margin: 3px 0 0;
+  accent-color: var(--accent);
+}
+
+.option span {
+  display: grid;
+}
+
+.option small {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.steps {
+  margin: 0 0 6px;
+  padding-left: 20px;
+  display: grid;
+  gap: 4px;
+}
+
+form {
+  display: grid;
+  gap: 6px;
+}
+
+label {
+  font-weight: 500;
+}
+
+.row,
+.connected {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.connected {
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+.grow {
+  flex: 1;
+  min-width: 0;
+}
+
+.dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--ok);
+  flex: none;
+}
+
+code {
+  font:
+    12px ui-monospace,
+    SFMono-Regular,
+    Menlo,
+    monospace;
+  color: var(--muted);
+}
+
+input[type='password'],
+button {
+  font: inherit;
+  color: inherit;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--field);
+}
+
+input[type='password'] {
+  flex: 1;
+  min-width: 0;
+  padding: 7px 10px;
+}
+
+button {
+  padding: 7px 12px;
+  cursor: pointer;
+}
+
+button:hover {
+  border-color: var(--muted);
+}
+
+button:disabled {
+  opacity: 0.6;
+  cursor: progress;
+}
+
+button.primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--on-accent);
+  font-weight: 600;
+}
+
+button.danger {
+  color: var(--danger);
+}
+
+:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.status-ok {
+  color: var(--ok);
+}
+
+.status-error {
+  color: var(--danger);
+}
+
+@media (max-width: 480px) {
+  .providers {
+    grid-template-columns: 1fr;
+  }
+
+  .connected {
+    flex-wrap: wrap;
+  }
+}

@@ -22,15 +22,9 @@
     </ul>
     <p class="hint">Hover or focus a label to see why.</p>
 
-    <form id="key-form" class="field">
-      <label for="api-key">AI Gateway API key</label>
-      <div class="row">
-        <input id="api-key" type="password" autocomplete="off" spellcheck="false" placeholder="vck_…" />
-        <button type="submit">Save</button>
-      </div>
-      <p id="key-status" class="hint" role="status">
-        Stored only in this browser. Sent only to <span class="nowrap">ai-gateway.vercel.sh</span>.
-      </p>
-    </form>
+    <section class="field connection">
+      <p id="connection" class="hint" role="status"></p>
+      <button id="open-settings" type="button"></button>
+    </section>
   </body>
 </html>

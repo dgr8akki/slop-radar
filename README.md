@@ -24,7 +24,8 @@
 - **Explains itself.** Hover or focus a label to see the percentages and the signals behind them: generic hook, one-line "broetry", stock AI phrases, engagement bait, or concrete first-hand details.
 - **Honest about doubt.** A post is only called human or slop when one side holds 60% of the probability. Everything else is "Unclear".
 - **Cheap and fast.** One Jev call per post, cached, so scrolling back costs nothing. Jev costs $0.042 per million input tokens.
-- **Minimal permissions.** Runs only on linkedin.com and talks only to Vercel AI Gateway.
+- **Bring your own key.** Use a TypeSafe key directly or a Vercel AI Gateway key.
+- **Minimal permissions.** Runs only on linkedin.com and talks only to your chosen Jev provider.
 
 ## How it works
 
@@ -53,14 +54,19 @@ Slop Radar isn't on the Chrome Web Store yet. To install from source:
 1. Download the latest `slop-radar-x.y.z.zip` from [Releases](https://github.com/dgr8akki/slop-radar/releases) and unzip it, or clone this repo.
 2. Open `chrome://extensions` and turn on **Developer mode**.
 3. Click **Load unpacked** and select the unzipped folder (or `src/` in a clone).
-4. Click the Slop Radar icon, paste your [AI Gateway API key](https://vercel.com/docs/ai-gateway/authentication-and-byok/api-keys) and select **Save**. The popup checks the key.
+4. The settings page opens on install. Pick where your key comes from, paste a [TypeSafe API key](https://console.typesafe.ai/keys) or a [Vercel AI Gateway API key](https://vercel.com/docs/ai-gateway/authentication-and-byok/api-keys), and select **Connect**. The key is checked before it's saved. (Later: **Change** in the popup.)
 5. Reload LinkedIn and scroll.
 
-Set a [spend limit](https://vercel.com/docs/ai-gateway/observability-and-spend/budgets) on the key you use. A heavy scrolling session costs well under a cent.
+With Vercel, set a [spend limit](https://vercel.com/docs/ai-gateway/observability-and-spend/budgets) on the key. Either way, a heavy scrolling session costs well under a cent.
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/options-dark.png" />
+  <img src="docs/options-light.png" width="520" alt="The Slop Radar settings page: a Connect Jev card with a choice between Vercel AI Gateway and TypeSafe, setup steps for the chosen provider, an API key field and a Connect button." />
+</picture>
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/popup-dark.png" />
-  <img src="docs/popup-light.png" width="280" alt="The Slop Radar popup: a legend explaining the Human, Unclear and AI slop labels, and the API key field." />
+  <img src="docs/popup-light.png" width="280" alt="The Slop Radar popup: a legend explaining the Human, Unclear and AI slop labels, and the Jev connection." />
 </picture>
 
 ## Privacy and permissions
@@ -68,10 +74,11 @@ Set a [spend limit](https://vercel.com/docs/ai-gateway/observability-and-spend/b
 | Permission                           | Why                                                      |
 | ------------------------------------ | -------------------------------------------------------- |
 | Content script on `www.linkedin.com` | Reads the text of posts in your feed and adds the labels |
-| `https://ai-gateway.vercel.sh/*`     | Sends post text to Jev for rating                        |
+| `https://api.typesafe.ai/*`          | Sends post text to Jev, if you picked TypeSafe           |
+| `https://ai-gateway.vercel.sh/*`     | Sends post text to Jev, if you picked Vercel             |
 | `storage`                            | Keeps your API key and cached ratings in this browser    |
 
-Only the visible text of posts is sent, to Vercel AI Gateway, which forwards it to TypeSafe. Author names, profiles, comments and your own activity are not sent. See [PRIVACY.md](PRIVACY.md).
+Only the visible text of posts is sent, either to TypeSafe directly or to Vercel AI Gateway, which forwards it to TypeSafe. Author names, profiles, comments and your own activity are not sent. See [PRIVACY.md](PRIVACY.md).
 
 ## Development
 
@@ -80,7 +87,7 @@ Requires Node.js 22 or later.
 ```sh
 npm install
 npm run check      # lint + format check + unit tests
-npm run eval       # live evaluation against Jev (needs AI_GATEWAY_API_KEY in .env)
+npm run eval       # live evaluation against Jev (needs TYPESAFE_API_KEY or AI_GATEWAY_API_KEY in .env)
 npm run package    # builds dist/slop-radar-<version>.zip for the Chrome Web Store
 ```
 
@@ -100,9 +107,11 @@ src/
 ├── manifest.json
 ├── background.js          Service worker: rates post text, keeps the key and cache
 ├── content/               LinkedIn content script and label styles
-├── popup/                 Legend and API key settings
+├── popup/                 Legend and Jev connection
+├── options/               Pick a provider; connect, test, replace or remove the key
 └── lib/
-    ├── jev.js             Jev client: retries, rate-limit pauses, clear errors
+    ├── connection.js      "Connected via …" row; opens settings
+    ├── jev.js             Jev client for TypeSafe or Vercel: retries, rate-limit pauses, clear errors
     └── rating.js          Questions, verdict rules, cache, one-at-a-time rater
 test/                      Unit tests (jsdom feed for the content script)
 evals/                     Live evaluation against Jev

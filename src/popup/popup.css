@@ -1,4 +1,4 @@
-/* Slop Radar popup: the legend is the content; settings stay small underneath. */
+/* Slop Radar popup: the legend is the content; the connection row stays small underneath. */
 
 :root {
   color-scheme: light dark;
@@ -9,8 +9,6 @@
   --line: #e0e2e6;
   --field: #ffffff;
   --focus: #2f5da8;
-  --ok: #2f7d4f;
-  --danger: #b3261e;
 
   --human: #2f7d4f;
   --unclear: #8a5a0f;
@@ -25,8 +23,6 @@
     --line: #34373d;
     --field: #25282d;
     --focus: #8ab4f8;
-    --ok: #7cc79b;
-    --danger: #f28b82;
   }
 }
 
@@ -119,28 +115,17 @@ ul {
   border-top: 1px solid var(--line);
 }
 
-.field label {
-  font-weight: 500;
+.connection {
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 10px;
 }
 
-.row {
-  display: flex;
-  gap: 8px;
-}
-
-input,
 button {
   font: inherit;
   color: inherit;
   border: 1px solid var(--line);
   border-radius: 6px;
-}
-
-input {
-  flex: 1;
-  min-width: 0;
-  padding: 6px 8px;
-  background: var(--field);
 }
 
 button {
@@ -153,19 +138,14 @@ button:hover {
   border-color: var(--muted);
 }
 
+button.primary {
+  background: var(--focus);
+  border-color: var(--focus);
+  color: var(--bg);
+  font-weight: 600;
+}
+
 :focus-visible {
   outline: 2px solid var(--focus);
   outline-offset: 2px;
-}
-
-.nowrap {
-  white-space: nowrap;
-}
-
-.status-ok {
-  color: var(--ok);
-}
-
-.status-error {
-  color: var(--danger);
 }

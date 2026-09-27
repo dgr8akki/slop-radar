@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Slop Radar settings</title>
+    <link rel="stylesheet" href="options.css" />
+    <script type="module" src="options.js"></script>
+  </head>
+  <body data-next="Reload LinkedIn to see labels.">
+    <main>
+      <header class="brand">
+        <img src="../icons/icon-48.png" width="40" height="40" alt="" />
+        <div>
+          <h1>Slop Radar</h1>
+          <p class="muted">Labels LinkedIn posts as human, unclear or AI slop as you scroll.</p>
+        </div>
+      </header>
+
+      <section class="card" aria-labelledby="connect-title">
+        <h2 id="connect-title">Connect Jev</h2>
+        <p class="muted">
+          Slop Radar calls Jev with your own API key, so you pay your provider directly. A heavy scrolling session costs
+          well under a cent.
+        </p>
+
+        <div id="connected" class="connected" hidden>
+          <span class="dot" aria-hidden="true"></span>
+          <div class="grow">
+            <p><strong>Connected</strong> via <span id="provider-label"></span> <code id="masked"></code></p>
+            <p id="connected-status" class="muted" role="status"></p>
+          </div>
+          <button id="test" type="button">Test</button>
+          <button id="replace" type="button">Replace</button>
+          <button id="remove" type="button" class="danger">Remove</button>
+        </div>
+
+        <form id="key-form" hidden>
+          <fieldset class="providers">
+            <legend>Where does your key come from?</legend>
+            <label class="option">
+              <input type="radio" name="provider" value="vercel" />
+              <span>
+                <strong>Vercel AI Gateway</strong>
+                <small>Billed to your Vercel account, with spend limits.</small>
+              </span>
+            </label>
+            <label class="option">
+              <input type="radio" name="provider" value="typesafe" />
+              <span>
+                <strong>TypeSafe</strong>
+                <small>Jev direct from its makers, billed by TypeSafe.</small>
+              </span>
+            </label>
+          </fieldset>
+          <ol id="steps" class="steps"></ol>
+          <label for="api-key">API key</label>
+          <div class="row">
+            <input
+              id="api-key"
+              type="password"
+              autocomplete="off"
+              spellcheck="false"
+              aria-describedby="key-status"
+              required
+            />
+            <button type="submit" class="primary">Connect</button>
+            <button id="cancel" type="button" hidden>Cancel</button>
+          </div>
+          <p id="key-status" class="muted" role="status"></p>
+        </form>
+      </section>
+
+      <p class="muted small">
+        Your key is stored only in this browser and sent only to <code id="host"></code>. See the
+        <a href="https://github.com/dgr8akki/slop-radar/blob/main/PRIVACY.md" target="_blank" rel="noreferrer"
+          >privacy policy</a
+        >.
+      </p>
+    </main>
+  </body>
+</html>

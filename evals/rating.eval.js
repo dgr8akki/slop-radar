@@ -52,11 +52,15 @@ Agree? ♻️ Repost to help someone in your network.`,
   ],
 ];
 
-if (!process.env.AI_GATEWAY_API_KEY) {
-  console.error('Set AI_GATEWAY_API_KEY (see .env.example) to run the live evaluation.');
+// TYPESAFE_API_KEY calls TypeSafe directly; otherwise AI_GATEWAY_API_KEY goes through Vercel.
+const provider = process.env.TYPESAFE_API_KEY ? 'typesafe' : 'vercel';
+const key = process.env.TYPESAFE_API_KEY || process.env.AI_GATEWAY_API_KEY;
+if (!key) {
+  console.error('Set TYPESAFE_API_KEY or AI_GATEWAY_API_KEY (see .env.example) to run the live evaluation.');
   process.exit(1);
 }
-const jev = createJevClient({ getKey: () => process.env.AI_GATEWAY_API_KEY });
+console.log(`Provider: ${provider}\n`);
+const jev = createJevClient({ getKey: () => key, getProvider: () => provider });
 
 /** Runs `fn`, waiting out rate limits and outages; other errors fail the case. */
 async function withRetry(fn) {
