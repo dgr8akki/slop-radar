@@ -1,0 +1,249 @@
+/* Shared look for the popup and settings page: the Organic tokens (cream ground,
+   terracotta accent, sage second voice) with bundled Figtree and Caprasimo.
+   LinkedIn pages never load this; the labels there use system fonts. */
+
+@font-face {
+  font-family: 'Figtree';
+  font-weight: 400 700;
+  font-display: swap;
+  src: url('fonts/figtree-latin.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'Caprasimo';
+  font-weight: 400;
+  font-display: swap;
+  src: url('fonts/caprasimo-latin.woff2') format('woff2');
+}
+
+:root {
+  color-scheme: light dark;
+
+  --font-heading: 'Caprasimo', system-ui, sans-serif;
+  --font-body: 'Figtree', system-ui, sans-serif;
+  --font-mono: ui-monospace, 'SF Mono', Menlo, monospace;
+
+  --color-bg: #f5ead8;
+  --color-surface: #ebddc5;
+  --color-text: #201e1d;
+  --color-accent: #c67139;
+  --color-accent-hover: #b2622d;
+  --color-accent-active: #8c491a;
+  --color-divider: rgb(32 30 29 / 16%);
+
+  --sr-link: #8c491a;
+  --sr-muted: #645c50;
+  --sr-sel: rgb(198 113 57 / 10%);
+  --sr-note-bg: #e1eecc;
+  --sr-note-fg: #3d472b;
+  --sr-num-bg: #ccdbb2;
+  --sr-num-fg: #272e1b;
+  --sr-info-bg: #f5ead8;
+  --sr-info-fg: #474238;
+  --sr-err-bg: #ffe1d0;
+  --sr-err-fg: #643312;
+  --sr-err-mark: #b2622d;
+  --sr-ok-bg: #e1eecc;
+  --sr-ok-fg: #3d472b;
+  --sr-ok-mark: #56633f;
+
+  --radius-pill: 999px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-bg: #201e1d;
+    --color-surface: #2e2b25;
+    --color-text: #f5ead8;
+    --color-accent: #d67f48;
+    --color-accent-hover: #f6a06b;
+    --color-accent-active: #ffc6a5;
+    --color-divider: rgb(245 234 216 / 18%);
+
+    --sr-link: #ffc6a5;
+    --sr-muted: #c0b6a5;
+    --sr-sel: rgb(214 127 72 / 14%);
+    --sr-note-bg: #272e1b;
+    --sr-note-fg: #e1eecc;
+    --sr-num-bg: #3d472b;
+    --sr-num-fg: #e1eecc;
+    --sr-info-bg: #201e1d;
+    --sr-info-fg: #eee7db;
+    --sr-err-bg: #402310;
+    --sr-err-fg: #ffe1d0;
+    --sr-err-mark: #f6a06b;
+    --sr-ok-bg: #272e1b;
+    --sr-ok-fg: #e1eecc;
+    --sr-ok-mark: #aebf92;
+  }
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+[hidden] {
+  display: none !important;
+}
+
+body {
+  margin: 0;
+  background: var(--color-bg);
+  color: var(--color-text);
+  font: 15px/1.55 var(--font-body);
+}
+
+h1,
+h2 {
+  margin: 0;
+  font-family: var(--font-heading);
+  font-weight: 400;
+  line-height: 1.12;
+  letter-spacing: -0.015em;
+}
+
+p {
+  margin: 0;
+}
+
+a {
+  color: var(--sr-link);
+  text-underline-offset: 3px;
+}
+
+code {
+  font-family: var(--font-mono);
+}
+
+:focus {
+  outline: none;
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+::selection {
+  background: rgb(198 113 57 / 30%);
+}
+
+.muted {
+  color: var(--sr-muted);
+}
+
+.mono {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+/* — buttons — */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: 0 20px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--color-text);
+  font: 14px/1.2 var(--font-heading);
+  cursor: pointer;
+}
+
+.btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.btn-primary {
+  background: var(--color-accent);
+  color: var(--color-bg);
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: var(--color-accent-hover);
+}
+
+.btn-primary:active:not(:disabled) {
+  background: var(--color-accent-active);
+}
+
+.btn-secondary {
+  border-color: var(--color-divider);
+}
+
+.btn-secondary:hover {
+  background: color-mix(in srgb, var(--color-text) 7%, transparent);
+}
+
+.btn-secondary:active {
+  background: color-mix(in srgb, var(--color-text) 14%, transparent);
+}
+
+.btn-ghost {
+  padding: 0 16px;
+  color: var(--sr-link);
+}
+
+.btn-ghost:hover {
+  background: color-mix(in srgb, var(--color-accent) 10%, transparent);
+}
+
+/* — status messages (settings) and marks — */
+.status {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 12px 16px;
+  border-radius: 18px;
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+.status:empty {
+  display: none;
+}
+
+.status svg {
+  flex: none;
+  margin-top: 1px;
+}
+
+.status[data-tone='progress'],
+.status[data-tone='info'] {
+  background: var(--sr-info-bg);
+  color: var(--sr-info-fg);
+  border: 1px solid var(--color-divider);
+}
+
+.status[data-tone='error'] {
+  background: var(--sr-err-bg);
+  color: var(--sr-err-fg);
+}
+
+.status[data-tone='ok'] {
+  background: var(--sr-ok-bg);
+  color: var(--sr-ok-fg);
+}
+
+@keyframes sr-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.spin {
+  transform-origin: 6px 6px;
+  animation: sr-spin 1.2s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spin {
+    animation: none;
+  }
+}

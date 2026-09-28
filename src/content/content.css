@@ -1,49 +1,158 @@
-/* Slop Radar labels on LinkedIn posts. Muted, earthy verdict colors: a calm note, not an alarm. */
-
-.slop-radar-post {
-  --slop-radar-color: #6b7079;
-  position: relative;
-  outline: 2px solid var(--slop-radar-color) !important;
-  outline-offset: -2px;
-}
-
-.slop-radar-post[data-slop-radar='human'] {
-  --slop-radar-color: #2f7d4f;
-}
-
-.slop-radar-post[data-slop-radar='slop'] {
-  --slop-radar-color: #b3261e;
-}
-
-.slop-radar-post[data-slop-radar='unclear'] {
-  --slop-radar-color: #8a5a0f;
-}
-
-.slop-radar-post[data-slop-radar='pending'],
-.slop-radar-post[data-slop-radar='error'] {
-  --slop-radar-color: #6b7079;
-  outline-style: dashed !important;
-}
+/* Slop Radar tags on LinkedIn posts: small cream seed tags, a colour LinkedIn never uses.
+   Filled tag = a verdict, outlined tag = no verdict yet. Only Human and AI slop mark the card,
+   with a 3px inset rule that follows its radius and never shifts LinkedIn's layout.
+   The popup reuses these rules for its legend. */
 
 .slop-radar-badge {
-  position: absolute;
-  top: 8px;
-  right: 48px;
-  z-index: 5;
-  padding: 2px 8px;
+  --sr-bg: #f9f4ed;
+  --sr-fg: #474238;
+  --sr-mark: #82796a;
+  --sr-ring: #dcd3c4;
+  --sr-edge: transparent;
+  --sr-focus: #201e1d;
+
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  box-sizing: border-box;
+  height: 24px;
+  min-width: 24px;
+  padding: 0 9px 0 7px;
+  border: 1px solid var(--sr-edge);
   border-radius: 999px;
-  background: var(--slop-radar-color);
-  color: #ffffff;
+  background: var(--sr-bg);
+  box-shadow: inset 0 0 0 1px var(--sr-ring);
+  color: var(--sr-fg);
   font:
-    600 11px/1.6 system-ui,
+    600 12px/1 system-ui,
     -apple-system,
     'Segoe UI',
     Roboto,
     sans-serif;
-  cursor: help;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+  cursor: default;
+}
+
+.slop-radar-badge svg {
+  display: block;
+  flex: none;
+  color: var(--sr-mark);
 }
 
 .slop-radar-badge:focus-visible {
-  outline: 2px solid var(--slop-radar-color);
+  outline: 2px solid var(--sr-focus);
   outline-offset: 2px;
+}
+
+.slop-radar-badge[data-slop-radar='slop'] {
+  --sr-bg: #fff2eb;
+  --sr-fg: #643312;
+  --sr-mark: #b2622d;
+  --sr-ring: #ffc6a5;
+}
+
+.slop-radar-badge[data-slop-radar='human'] {
+  --sr-bg: #f0fae1;
+  --sr-fg: #3d472b;
+  --sr-mark: #728157;
+  --sr-ring: #ccdbb2;
+}
+
+.slop-radar-badge[data-slop-radar='pending'],
+.slop-radar-badge[data-slop-radar='error'] {
+  --sr-bg: transparent;
+  --sr-fg: #645c50;
+  --sr-mark: #82796a;
+  --sr-ring: transparent;
+  --sr-edge: #a19786;
+}
+
+.slop-radar-badge[data-slop-radar='pending'] {
+  border-style: dashed;
+}
+
+/* On LinkedIn's dark theme: the same cream stock one step deeper, to cut glare. */
+[data-slop-radar-theme='dark'] .slop-radar-badge {
+  --sr-bg: #eee7db;
+  --sr-fg: #2e2b25;
+  --sr-mark: #645c50;
+  --sr-ring: transparent;
+  --sr-focus: #f5ead8;
+}
+
+[data-slop-radar-theme='dark'] .slop-radar-badge[data-slop-radar='slop'] {
+  --sr-bg: #ffe1d0;
+  --sr-fg: #402310;
+  --sr-mark: #b2622d;
+}
+
+[data-slop-radar-theme='dark'] .slop-radar-badge[data-slop-radar='human'] {
+  --sr-bg: #e1eecc;
+  --sr-fg: #272e1b;
+  --sr-mark: #56633f;
+}
+
+[data-slop-radar-theme='dark'] .slop-radar-badge[data-slop-radar='pending'],
+[data-slop-radar-theme='dark'] .slop-radar-badge[data-slop-radar='error'] {
+  --sr-bg: transparent;
+  --sr-fg: #dcd3c4;
+  --sr-mark: #dcd3c4;
+  --sr-edge: #82796a;
+}
+
+@keyframes slop-radar-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.slop-radar-spin {
+  transform-origin: 6px 6px;
+  animation: slop-radar-spin 1.2s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .slop-radar-spin {
+    animation: none;
+  }
+}
+
+/* — On the post card — */
+
+.slop-radar-post {
+  position: relative;
+}
+
+.slop-radar-post > .slop-radar-badge {
+  position: absolute;
+  top: 8px;
+  right: 48px;
+  z-index: 5;
+}
+
+.slop-radar-post[data-slop-radar='slop']::after,
+.slop-radar-post[data-slop-radar='human']::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  box-shadow: inset 3px 0 0 var(--sr-rule);
+  pointer-events: none;
+}
+
+.slop-radar-post[data-slop-radar='slop'] {
+  --sr-rule: #d67f48;
+}
+
+.slop-radar-post[data-slop-radar='human'] {
+  --sr-rule: #8fa073;
+}
+
+.slop-radar-post[data-slop-radar-theme='dark'][data-slop-radar='slop'] {
+  --sr-rule: #f6a06b;
+}
+
+.slop-radar-post[data-slop-radar-theme='dark'][data-slop-radar='human'] {
+  --sr-rule: #aebf92;
 }

@@ -25,11 +25,15 @@ export async function getConnection() {
 export async function mountConnection(text, button, onChange = () => {}) {
   async function render() {
     const { apiKey, provider } = await getConnection();
-    text.textContent = apiKey
-      ? `Connected via ${PROVIDERS[provider].label} · ${maskKey(apiKey)}`
-      : 'Connect a TypeSafe or Vercel AI Gateway key to start.';
+    if (apiKey) {
+      const key = Object.assign(document.createElement('span'), { className: 'mono', textContent: maskKey(apiKey) });
+      text.replaceChildren(`Connected via ${PROVIDERS[provider].label}`, key);
+    } else {
+      text.textContent = 'Connect a TypeSafe or Vercel AI Gateway key to start.';
+    }
     button.textContent = apiKey ? 'Change' : 'Connect Jev';
-    button.classList.toggle('primary', !apiKey);
+    button.classList.toggle('btn-primary', !apiKey);
+    button.classList.toggle('btn-secondary', Boolean(apiKey));
     onChange(Boolean(apiKey));
     return Boolean(apiKey);
   }

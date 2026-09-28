@@ -17,6 +17,16 @@ const STEPS = {
   typesafe: [`${link(PROVIDERS.typesafe.keysUrl, 'Create an API key')} in the TypeSafe console.`, 'Paste it here.'],
 };
 
+/** Status icons per tone. Trusted constants. */
+const ICONS = {
+  progress:
+    '<svg width="18" height="18" viewBox="0 0 12 12" aria-hidden="true"><circle cx="6" cy="6" r="4.6" fill="none" stroke="currentColor" stroke-opacity="0.3" stroke-width="1.5"/><g class="spin"><path d="M6 1.4 A4.6 4.6 0 0 1 10.6 6" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></g></svg>',
+  error:
+    '<svg width="18" height="18" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="8" fill="var(--sr-err-mark)"/><path d="M8 4.2v4.6" stroke="var(--sr-err-bg)" stroke-width="2" stroke-linecap="round"/><circle cx="8" cy="11.6" r="1.1" fill="var(--sr-err-bg)"/></svg>',
+  ok: '<svg width="18" height="18" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="8" fill="var(--sr-ok-mark)"/><path d="M4.8 8.2l2.1 2.1 4.3-4.5" fill="none" stroke="var(--sr-ok-bg)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  info: '<svg width="18" height="18" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="7" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M5.2 8h5.6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>',
+};
+
 const form = document.getElementById('key-form');
 const input = document.getElementById('api-key');
 const cancel = document.getElementById('cancel');
@@ -33,7 +43,7 @@ const selected = () => radios.find((radio) => radio.checked)?.value ?? provider;
 
 /** Steps, placeholder and privacy line follow the provider being shown. */
 function showProvider(id) {
-  document.getElementById('steps').innerHTML = STEPS[id].map((step) => `<li>${step}</li>`).join('');
+  document.getElementById('steps').innerHTML = STEPS[id].map((step) => `<li><span>${step}</span></li>`).join('');
   input.placeholder = PROVIDERS[id].placeholder;
   document.getElementById('host').textContent = PROVIDERS[id].host;
 }
@@ -44,6 +54,11 @@ function render(editing = false) {
   connected.hidden = showForm;
   cancel.hidden = !apiKey;
   input.value = '';
+  const replacing = showForm && Boolean(apiKey);
+  document.getElementById('form-title').textContent = replacing ? 'Replace your key' : 'Connect Jev';
+  const current = document.getElementById('current');
+  current.hidden = !replacing;
+  current.textContent = `Currently connected via ${PROVIDERS[provider].label} · ${maskKey(apiKey)}`;
   radios.forEach((radio) => (radio.checked = radio.value === provider));
   showProvider(provider);
   document.getElementById('provider-label').textContent = PROVIDERS[provider].label;
@@ -75,9 +90,11 @@ async function test(id, key) {
   }
 }
 
-function setStatus(el, text, tone) {
-  el.textContent = text;
-  el.className = tone ? `status-${tone}` : 'muted';
+/** @param {'progress' | 'error' | 'ok' | 'info'} [tone] An empty `text` hides the box. */
+function setStatus(el, text, tone = 'info') {
+  el.dataset.tone = tone;
+  el.innerHTML = text ? ICONS[tone] : '';
+  if (text) el.append(Object.assign(document.createElement('div'), { textContent: text }));
 }
 
 form.addEventListener('submit', async (event) => {
@@ -86,9 +103,11 @@ form.addEventListener('submit', async (event) => {
   const key = input.value.trim();
   const button = form.querySelector('button[type="submit"]');
   button.disabled = true;
-  setStatus(formStatus, `Checking key with ${PROVIDERS[id].label}…`);
+  button.textContent = 'Checking…';
+  setStatus(formStatus, `Checking key with ${PROVIDERS[id].label}…`, 'progress');
   const error = await test(id, key);
   button.disabled = false;
+  button.textContent = 'Connect';
   if (error) return setStatus(formStatus, error, 'error');
   apiKey = key;
   provider = id;
@@ -99,7 +118,7 @@ form.addEventListener('submit', async (event) => {
 });
 
 document.getElementById('test').addEventListener('click', async () => {
-  setStatus(connectedStatus, 'Checking key…');
+  setStatus(connectedStatus, 'Checking key…', 'progress');
   const error = await test(provider, apiKey);
   setStatus(connectedStatus, error || 'Key works.', error ? 'error' : 'ok');
 });

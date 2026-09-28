@@ -86,9 +86,39 @@ describe('content script', () => {
     assert.equal(feed.post('a').dataset.slopRadar, 'slop');
     const badge = feed.post('a').querySelector('.slop-radar-badge');
     assert.equal(badge.textContent, 'AI slop');
-    assert.equal(badge.title, 'AI slop: 90% slop, 5% human. Signals: Generic hook, Engagement bait.');
+    assert.equal(
+      badge.getAttribute('aria-label'),
+      'Slop Radar. AI slop: 90% slop, 5% human. Signals: Generic hook, Engagement bait.',
+    );
     assert.equal(badge.getAttribute('role'), 'note');
     assert.equal(badge.tabIndex, 0);
+  });
+
+  it('explains the tag in a popover on focus, grouped by direction, and closes on Escape', async () => {
+    const feed = loadFeed(post('a', LONG), () =>
+      rating('unclear', { signals: ['Generic hook', 'Concrete first-hand details'] }),
+    );
+    await feed.show(feed.post('a'));
+    const badge = feed.post('a').querySelector('.slop-radar-badge');
+    badge.dispatchEvent(new feed.window.FocusEvent('focus'));
+
+    const pop = feed.window.document.getElementById('slop-radar-popover').shadowRoot.querySelector('.pop');
+    assert.equal(pop.hidden, false);
+    assert.equal(pop.querySelector('.title').textContent, 'Could go either way');
+    assert.equal(pop.querySelector('.nums').textContent, '5% human85% neither10% slop');
+    const groups = [...pop.querySelectorAll('.group')].map((g) => g.textContent);
+    assert.deepEqual(groups, ['Pointing to slopGeneric hook', 'Pointing to humanConcrete first-hand details']);
+    assert.equal(pop.querySelector('.foot').textContent, 'Judges writing style, not who wrote it.');
+
+    feed.window.document.dispatchEvent(new feed.window.KeyboardEvent('keydown', { key: 'Escape' }));
+    assert.equal(pop.hidden, true);
+  });
+
+  it('marks posts on a dark LinkedIn card so the tags step deeper', async () => {
+    const feed = loadFeed(post('a', LONG), () => rating('human'));
+    feed.window.document.body.style.backgroundColor = 'rgb(27, 31, 35)';
+    await feed.show(feed.post('a'));
+    assert.equal(feed.post('a').dataset.slopRadarTheme, 'dark');
   });
 
   it('skips posts too short to judge', async () => {
@@ -115,7 +145,7 @@ describe('content script', () => {
     await feed.show(feed.post('a'));
     const badge = feed.post('a').querySelector('.slop-radar-badge');
     assert.equal(badge.textContent, 'Not rated');
-    assert.equal(badge.title, 'Add your AI Gateway API key in settings.');
+    assert.equal(badge.getAttribute('aria-label'), 'Slop Radar. Not rated. Add your AI Gateway API key in settings.');
   });
 
   it('asks for a reload after the extension is updated', async () => {
@@ -123,6 +153,6 @@ describe('content script', () => {
       throw new Error('Extension context invalidated.');
     });
     await feed.show(feed.post('a'));
-    assert.match(feed.post('a').querySelector('.slop-radar-badge').title, /Reload the page/);
+    assert.match(feed.post('a').querySelector('.slop-radar-badge').getAttribute('aria-label'), /Reload the page/);
   });
 });

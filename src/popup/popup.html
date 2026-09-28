@@ -4,27 +4,71 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Slop Radar</title>
+    <link rel="stylesheet" href="../ui/theme.css" />
+    <link rel="stylesheet" href="../content/content.css" />
     <link rel="stylesheet" href="popup.css" />
     <script type="module" src="popup.js"></script>
   </head>
   <body>
     <header class="brand">
-      <img src="../icons/icon-32.png" width="20" height="20" alt="" />
+      <img src="../icons/icon-128.png" width="30" height="30" alt="" />
       <h1>Slop Radar</h1>
     </header>
 
     <p class="intro">Labels LinkedIn posts as you scroll, by how much they read like generic AI writing.</p>
 
     <ul class="legend" aria-label="What the labels mean">
-      <li><span class="badge human">Human</span> Specific, first-hand, written by a person</li>
-      <li><span class="badge unclear">Unclear</span> Could go either way</li>
-      <li><span class="badge slop">AI slop</span> Formulaic hooks, stock phrases, engagement bait</li>
+      <li>
+        <span class="slop-radar-badge" data-slop-radar="human"
+          ><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true">
+            <circle cx="6" cy="6" r="5" fill="currentColor" /></svg
+          >Human</span
+        >
+        Specific, first-hand, written by a person
+      </li>
+      <li>
+        <span class="slop-radar-badge" data-slop-radar="unclear"
+          ><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true">
+            <circle cx="6" cy="6" r="4.6" fill="none" stroke="currentColor" stroke-width="1.6" />
+            <path d="M6 1.4 A4.6 4.6 0 0 1 6 10.6 Z" fill="currentColor" /></svg
+          >Unclear</span
+        >
+        Could go either way
+      </li>
+      <li>
+        <span class="slop-radar-badge" data-slop-radar="slop"
+          ><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true">
+            <circle
+              cx="6"
+              cy="6"
+              r="4.4"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2.2"
+              stroke-linecap="round"
+              stroke-dasharray="0.1 3.35"
+            /></svg
+          >AI slop</span
+        >
+        Formulaic hooks, stock phrases, engagement bait
+      </li>
     </ul>
     <p class="hint">Hover or focus a label to see why.</p>
 
-    <section class="field connection">
-      <p id="connection" class="hint" role="status"></p>
-      <button id="open-settings" type="button"></button>
+    <section id="connection-row" class="connection">
+      <svg class="mark" width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
+        <circle cx="8" cy="8" r="8" fill="var(--sr-ok-mark)" />
+        <path
+          d="M4.8 8.2l2.1 2.1 4.3-4.5"
+          fill="none"
+          stroke="var(--color-bg)"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        />
+      </svg>
+      <p id="connection" role="status"></p>
+      <button id="open-settings" type="button" class="btn"></button>
     </section>
   </body>
 </html>

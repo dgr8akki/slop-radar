@@ -47,7 +47,7 @@ export const SIGNALS = {
   format: 'Broetry or emoji bullets',
   buzz: 'Stock AI phrasing',
   bait: 'Engagement bait',
-  specific: 'Concrete first-hand details (a human sign)',
+  specific: 'Concrete first-hand details', // content.js groups this one under "Pointing to human"
 };
 
 /** A side of the scale needs this much probability to decide the verdict. */
@@ -90,7 +90,7 @@ export function toRating(answers) {
  * @param {{ max?: number, now?: () => number }} [options]
  */
 export function createCache(storage, { max = 2000, now = () => Date.now() } = {}) {
-  const KEY = 'ratings:v2'; // bump when the Rating shape changes
+  const KEY = 'ratings:v3'; // bump when the Rating shape or signal wording changes
   return {
     /** @returns {Promise<Rating | undefined>} */
     async get(text) {

@@ -7,13 +7,13 @@
 **See which LinkedIn posts read like AI slop before you read them.** Each post gets a quiet label as it scrolls into view: human, unclear or AI slop, with the reasons one hover away.
 
 [![CI](https://github.com/dgr8akki/slop-radar/actions/workflows/ci.yml/badge.svg)](https://github.com/dgr8akki/slop-radar/actions/workflows/ci.yml)
-[![License: MIT](https://img.shields.io/badge/license-MIT-2b3440.svg)](LICENSE)
-![Manifest V3](https://img.shields.io/badge/manifest-v3-2b3440.svg)
-![Chrome 116+](https://img.shields.io/badge/chrome-116%2B-2b3440.svg)
+[![License: MIT](https://img.shields.io/badge/license-MIT-c67139.svg)](LICENSE)
+![Manifest V3](https://img.shields.io/badge/manifest-v3-c67139.svg)
+![Chrome 116+](https://img.shields.io/badge/chrome-116%2B-c67139.svg)
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/feed-dark.png" />
-  <img src="docs/feed-light.png" width="520" alt="Three feed posts with Slop Radar labels: a formulaic post labelled AI slop in red, a specific debugging story labelled Human in green, and a generic announcement labelled Unclear in ochre." />
+  <img src="docs/feed-light.png" width="520" alt="LinkedIn feed posts with Slop Radar tags: a formulaic post tagged AI slop with its popover open showing 86% slop and three signals, a hydrologist's field report tagged Human, a hiring post tagged Unclear, and one still Checking." />
 </picture>
 
 </div>
@@ -21,7 +21,8 @@
 ## Features
 
 - **Labels as you scroll.** Posts are rated when they're 40% on screen, so there's nothing to click.
-- **Explains itself.** Hover or focus a label to see the percentages and the signals behind them: generic hook, one-line "broetry", stock AI phrases, engagement bait, or concrete first-hand details.
+- **Explains itself.** Hover or focus a label for a popover with one two-sided meter (human from the left, slop from the right) and the signals behind it, grouped by which way they point: generic hook, one-line "broetry", stock AI phrases, engagement bait, or concrete first-hand details.
+- **Calm on the page.** Small cream tags with a glyph per state; only Human and AI slop add a thin rule to the card. Works on LinkedIn's light and dark themes.
 - **Honest about doubt.** A post is only called human or slop when one side holds 60% of the probability. Everything else is "Unclear".
 - **Cheap and fast.** One Jev call per post, cached, so scrolling back costs nothing. Jev costs $0.042 per million input tokens.
 - **Bring your own key.** Use a TypeSafe key directly or a Vercel AI Gateway key.
@@ -61,12 +62,12 @@ With Vercel, set a [spend limit](https://vercel.com/docs/ai-gateway/observabilit
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/options-dark.png" />
-  <img src="docs/options-light.png" width="520" alt="The Slop Radar settings page: a Connect Jev card with a choice between Vercel AI Gateway and TypeSafe, setup steps for the chosen provider, an API key field and a Connect button." />
+  <img src="docs/options-light.png" width="520" alt="The Slop Radar settings page: a note that it judges style, not authorship, then a Connect Jev card with provider cards for Vercel AI Gateway and TypeSafe, numbered setup steps, an API key field and a Connect button." />
 </picture>
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/popup-dark.png" />
-  <img src="docs/popup-light.png" width="280" alt="The Slop Radar popup: a legend explaining the Human, Unclear and AI slop labels, and the Jev connection." />
+  <img src="docs/popup-light.png" width="280" alt="The Slop Radar popup: a legend with the Human, Unclear and AI slop tags, and a card showing the connected provider and masked key with a Change button." />
 </picture>
 
 ## Privacy and permissions
@@ -109,6 +110,7 @@ src/
 ├── content/               LinkedIn content script and label styles
 ├── popup/                 Legend and Jev connection
 ├── options/               Pick a provider; connect, test, replace or remove the key
+├── ui/                    Shared theme and bundled fonts (Figtree, Caprasimo; OFL) for popup and settings
 └── lib/
     ├── connection.js      "Connected via …" row; opens settings
     ├── jev.js             Jev client for TypeSafe or Vercel: retries, rate-limit pauses, clear errors

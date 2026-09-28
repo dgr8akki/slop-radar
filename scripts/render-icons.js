@@ -1,7 +1,8 @@
-// Renders assets/icon.svg to the PNG sizes Chrome needs, using headless Chrome.
+// Renders assets/icon.svg (and icon-16.svg, a simpler drawing for the toolbar) to the PNG sizes Chrome needs,
+// using headless Chrome.
 // Usage: npm run icons   (set CHROME_PATH if Chrome isn't in the default location)
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -15,7 +16,10 @@ const chrome =
   }[process.platform];
 
 const root = new URL('../', import.meta.url);
-const svg = readFileSync(new URL('assets/icon.svg', root), 'utf8');
+const svgFor = (size) => {
+  const own = new URL(`assets/icon-${size}.svg`, root);
+  return readFileSync(existsSync(own) ? own : new URL('assets/icon.svg', root), 'utf8');
+};
 const work = mkdtempSync(join(tmpdir(), 'icons-'));
 
 try {
@@ -23,7 +27,7 @@ try {
     const page = join(work, `icon-${size}.html`);
     writeFileSync(
       page,
-      `<!doctype html><style>html,body{margin:0;background:transparent}svg{display:block;width:${size}px;height:${size}px}</style>${svg}`,
+      `<!doctype html><style>html,body{margin:0;background:transparent}svg{display:block;width:${size}px;height:${size}px}</style>${svgFor(size)}`,
     );
     const target = new URL(`src/icons/icon-${size}.png`, root).pathname;
     execFileSync(
