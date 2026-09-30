@@ -24,6 +24,17 @@ jobs:
       - run: npm run lint
       - run: npm run format:check
       - run: npm test
+
+      # Files listed in SHARED.md must match the pinned jev-shared commit. Runs after the tests so a
+      # drift failure never hides lint or test results.
+      - name: Shared files match upstream
+        run: node scripts/sync-shared.js --check
+        env:
+          # jev-shared is private for now, so the script needs a token that can read it.
+          JEV_SHARED_TOKEN: ${{ secrets.JEV_SHARED_TOKEN }}
+        # Remove once jev-shared is public: until then a missing secret would fail every build.
+        continue-on-error: true
+
       - run: npm run package
 
       - uses: actions/upload-artifact@v7

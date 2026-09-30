@@ -7,6 +7,11 @@
  * with probabilities. Everything the extension acts on is picked from lists
  * that our own code builds.
  *
+ * A 429 pauses the client until Retry-After. By default that pause lives in
+ * memory, which a service-worker restart forgets; pass `pauseStore` (see
+ * `sessionPauseStore`) to keep it in `chrome.storage.session` instead, so the
+ * next command after a restart still waits out the backoff.
+ *
  * @module lib/jev
  */
 
@@ -105,6 +110,40 @@ export class JevError extends Error {
 }
 
 /**
+ * @typedef {object} PauseStore Where the rate-limit pause (a `Date.now()` value) is kept.
+ * @property {() => Promise<number | undefined>} get
+ * @property {(until: number) => Promise<void>} set
+ */
+
+/** @returns {PauseStore} The default: module memory, lost when the worker restarts. */
+function memoryPauseStore() {
+  let until = 0;
+  return {
+    get: async () => until,
+    set: async (value) => {
+      until = value;
+    },
+  };
+}
+
+/**
+ * A pause store over a `chrome.storage` area, meant for `chrome.storage.session`
+ * so the pause survives a service-worker restart but not a browser restart:
+ *
+ *   createJevClient({ …, pauseStore: sessionPauseStore(chrome.storage.session) })
+ *
+ * @param {{ get(key: string): Promise<Record<string, any>>, set(items: Record<string, any>): Promise<void> }} area
+ * @param {string} [key]
+ * @returns {PauseStore}
+ */
+export function sessionPauseStore(area, key = 'jev:pausedUntil') {
+  return {
+    get: async () => (await area.get(key))[key],
+    set: (until) => area.set({ [key]: until }),
+  };
+}
+
+/**
  * @typedef {object} JevClient
  * @property {(body: { state: unknown, questions: object }) => Promise<Record<string, any>>} evaluate
  *   Runs one evaluation and resolves with the `answers` object.
@@ -118,6 +157,7 @@ export class JevError extends Error {
  * @param {() => number} [options.now] Injected for tests.
  * @param {number} [options.timeoutMs] How long one request may take before it fails. Injected for tests.
  * @param {(ms: number) => Promise<void>} [options.sleep] Injected for tests.
+ * @param {PauseStore} [options.pauseStore] Where the 429 pause is kept; defaults to module memory.
  * @returns {JevClient}
  */
 export function createJevClient({
@@ -127,10 +167,22 @@ export function createJevClient({
   now = () => Date.now(),
   timeoutMs = DEFAULT_TIMEOUT_MS,
   sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
+  pauseStore = memoryPauseStore(),
 }) {
-  let pausedUntil = 0;
+  // A store that fails must never hide the provider's answer: read as "no pause", write and move on.
+  const pausedUntil = () =>
+    Promise.resolve()
+      .then(() => pauseStore.get())
+      .then(
+        (until) => until ?? 0,
+        () => 0,
+      );
+  const pauseUntil = (until) =>
+    Promise.resolve()
+      .then(() => pauseStore.set(until))
+      .catch(() => {});
 
-  const secondsPaused = () => Math.max(0, Math.ceil((pausedUntil - now()) / 1000));
+  const secondsPaused = async () => Math.max(0, Math.ceil(((await pausedUntil()) - now()) / 1000));
 
   async function post(provider, key, body) {
     try {
@@ -153,7 +205,7 @@ export function createJevClient({
   }
 
   async function evaluate(body) {
-    const wait = secondsPaused();
+    const wait = await secondsPaused();
     if (wait) throw busyError(wait);
 
     const provider = PROVIDERS[await getProvider()] ?? PROVIDERS[DEFAULT_PROVIDER];
@@ -183,7 +235,7 @@ export function createJevClient({
 
     if (res.status === 429) {
       const retryAfter = Number(res.headers.get('retry-after')) || DEFAULT_RETRY_AFTER_S;
-      pausedUntil = now() + retryAfter * 1000;
+      await pauseUntil(now() + retryAfter * 1000);
       throw busyError(retryAfter);
     }
     // Vercel rejects keys with 401; TypeSafe with 403 and an authentication_error.

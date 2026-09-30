@@ -9,7 +9,7 @@ Slop Radar is a Chrome extension that labels LinkedIn posts by how much they rea
 | Data                                                  | Where it goes                                                                                                                                                          | Why                      |
 | ----------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------ |
 | The visible text of feed posts that scroll into view  | The provider you pick in settings: [TypeSafe](https://typesafe.ai) directly, or [Vercel AI Gateway](https://vercel.com/docs/ai-gateway), which forwards it to TypeSafe | Rating the post          |
-| Ratings (a verdict, two percentages and signal names) | `chrome.storage.local` in this browser, keyed by a hash of the post text; the most recent 2,000 are kept                                                               | Not paying to rate twice |
+| Ratings (a verdict, two percentages and signal names) | `chrome.storage.local` in this browser, keyed by a hash of the post text; roughly the most recent 2,000 are kept                                                       | Not paying to rate twice |
 | Your API key and provider                             | `chrome.storage.local` in this browser only, readable only by the extension's own pages                                                                                | Authenticating requests  |
 
 Slop Radar does **not** send author names, profiles, comments, messages, or anything about your own account or activity. It runs only on `www.linkedin.com`.

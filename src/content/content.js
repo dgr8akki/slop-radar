@@ -13,11 +13,16 @@
   const BODY = '[data-testid="expandable-text-box"]';
   const MIN_CHARS = 80; // too short to judge (reposts, one-liners)
   const REGROW = 1.3; // re-rate when "… more" reveals 30% more text
-  const SCAN_MS = 1500;
+  const SCAN_DEBOUNCE_MS = 250; // one scan per burst of DOM changes; LinkedIn re-renders constantly
+  // Routes that show posts. Everything else on linkedin.com (messaging, jobs, profiles) has none to rate.
+  const FEED_ROUTE =
+    /^\/(?:$|feed\b|posts\/|in\/[^/]+\/recent-activity|company\/[^/]+\/posts|search\/results\/content)/;
   const HIDE_GRACE_MS = 150; // lets the pointer travel from the tag into the popover
   const RETRY_MS = 1000; // a worker woken by the message sometimes drops that first reply
   const MAX_PAUSE_S = 60; // longest the page waits on a provider pause before asking again
-  const POPOVER_WIDTH = 288;
+  const REPLY_TIMEOUT_MS = 30_000; // from the worker starting the request; it gives up on the provider at 20 s
+  const QUEUE_TIMEOUT_MS = 120_000; // from queueing; only a worker that died mid-queue takes this long
+  const POPOVER_WIDTH = 288; // minimum; the card grows for longer signal text
   const HUMAN_SIGNALS = ['Concrete first-hand details']; // SIGNALS.specific in lib/rating.js
 
   const LABELS = { slop: 'AI slop', human: 'Human', unclear: 'Unclear', pending: 'Checking', error: 'Not rated' };
@@ -49,41 +54,60 @@
   const observed = new WeakSet();
   const visibility = new IntersectionObserver(
     (entries) => {
-      for (const entry of entries) if (entry.isIntersecting) check(entry.target);
+      for (const entry of entries) {
+        if (entry.isIntersecting) check(entry.target);
+        else left(entry.target);
+      }
     },
     { threshold: 0.4 },
   );
 
-  // The feed is infinite and re-rendered by React, so rescan rather than trust mutation paths.
+  // The feed is infinite and re-rendered by React, so rescan the document rather than trust mutation
+  // paths; the mutation observer only says when. Nothing runs in a hidden tab or off the feed routes.
+  let scanTimer;
   function scan() {
+    scanTimer = undefined;
+    if (document.hidden || !FEED_ROUTE.test(location.pathname)) return;
     for (const post of document.querySelectorAll(POST)) {
       if (observed.has(post)) continue;
       observed.add(post);
       visibility.observe(post);
     }
   }
+  function scanSoon() {
+    scanTimer ??= setTimeout(scan, SCAN_DEBOUNCE_MS);
+  }
   scan();
-  setInterval(scan, SCAN_MS);
+  new MutationObserver(scanSoon).observe(document.body, { childList: true, subtree: true });
+  document.addEventListener('visibilitychange', scanSoon);
 
   async function check(post, retried = false) {
-    if (paused) return skipped.add(post); // rated when a key arrives; see resume()
+    if (paused) return remember(post); // rated when a key arrives; see resume()
     const text = (post.querySelector(BODY)?.innerText ?? post.querySelector(BODY)?.textContent ?? '').trim();
     const ratedLength = Number(post.dataset.slopRadarLength) || 0;
-    if (text.length < MIN_CHARS || text.length < ratedLength * REGROW) return;
+    if (text.length < MIN_CHARS || text.length < ratedLength * REGROW) {
+      if (ratedLength) visibility.unobserve(post); // re-observed by a click that did not grow the text
+      return;
+    }
     post.dataset.slopRadarLength = String(text.length);
 
     label(post, { state: 'pending' });
     let response;
     try {
-      response = await chrome.runtime.sendMessage({ type: 'rate', text });
-    } catch {
+      response = await ask(post, text);
+    } catch (error) {
+      if (error?.message === 'cancelled') return unlabel(post); // scrolled away before its turn; checked again on return
+      if (error?.message === 'timeout') {
+        post.dataset.slopRadarLength = '0'; // so scrolling past and back tries again
+        return label(post, { state: 'error', message: 'Slop Radar took too long. Scroll past and back to try again.' });
+      }
       // No runtime id means the extension was updated and this script is orphaned. Otherwise the
       // worker was asleep and the port closed before it answered; one more try after a moment.
       if (!chrome.runtime?.id) {
         return label(post, { state: 'error', message: 'Slop Radar was updated. Reload the page to rate posts again.' });
       }
       if (!retried) return setTimeout(() => recheck(post, true), RETRY_MS);
-      post.dataset.slopRadarLength = '0'; // so scrolling past and back tries again
+      post.dataset.slopRadarLength = '0';
       return label(post, { state: 'error', message: "Slop Radar didn't answer. Scroll past and back to try again." });
     }
     if (response?.retryAfter) {
@@ -93,6 +117,57 @@
     if (!response || response.error)
       return label(post, { state: 'error', message: response?.error ?? 'Rating failed.' });
     label(post, { state: response.rating.verdict, rating: response.rating });
+    // Rated: stop watching it scroll. A click on the post ("…more") brings it back for the re-rate check.
+    visibility.unobserve(post);
+    post.addEventListener('click', () => visibility.observe(post), { once: true });
+  }
+
+  // The worker rates one post at a time. It acknowledges a request at once, says when the post's turn
+  // comes, and sends the result over the tab; the 30 s clock runs from the turn, not from queueing.
+  let nextId = 0;
+  const pending = new Map(); // id -> waiting request
+  const waiting = new WeakMap(); // post -> its waiting request, to cancel if it scrolls away first
+
+  function ask(post, text) {
+    const id = (nextId += 1);
+    return chrome.runtime.sendMessage({ type: 'rate', id, text }).then((ack) => {
+      if (!ack?.queued) return ack; // answered on the spot
+      return new Promise((resolve, reject) => {
+        const fail = (why) => {
+          clearTimeout(entry.timer);
+          pending.delete(id);
+          waiting.delete(post);
+          reject(new Error(why));
+        };
+        const entry = {
+          started: false,
+          timer: setTimeout(() => fail('timeout'), QUEUE_TIMEOUT_MS),
+          start() {
+            entry.started = true;
+            clearTimeout(entry.timer);
+            entry.timer = setTimeout(() => fail('timeout'), REPLY_TIMEOUT_MS);
+          },
+          finish(result) {
+            clearTimeout(entry.timer);
+            pending.delete(id);
+            waiting.delete(post);
+            resolve(result);
+          },
+          cancel() {
+            chrome.runtime.sendMessage({ type: 'cancel', id }).catch(() => {});
+            fail('cancelled');
+          },
+        };
+        pending.set(id, entry);
+        waiting.set(post, entry);
+      });
+    });
+  }
+
+  /** A post scrolled out before the worker got to it: no point rating what nobody is looking at. */
+  function left(post) {
+    const entry = waiting.get(post);
+    if (entry && !entry.started) entry.cancel();
   }
 
   /** Rates the post again as if it had just scrolled into view. */
@@ -108,24 +183,32 @@
   let card = null;
   let dismissed = false;
 
+  const MAX_SKIPPED = 40; // enough to cover the screen; older ones are scrolled away anyway
   const CARD_COPY = {
     'no-key': {
       text: "Slop Radar isn't connected yet.",
       button: 'Connect Jev',
-      aside: 'two minutes, costs under a cent a week.',
+      aside: 'Connecting takes two minutes and costs under a cent a week.',
     },
     'bad-key': {
       text: "Slop Radar's API key was rejected by the provider.",
       button: 'Check the key',
-      aside: 'posts stay unlabelled until it works.',
+      aside: 'Posts stay unlabelled until it works.',
     },
   };
 
   function pause(post, code) {
     paused = true;
     unlabel(post);
-    skipped.add(post);
+    remember(post);
     if (!card && !dismissed) showCard(post, code);
+  }
+
+  /** Keeps the set of posts to rate on resume small on an infinite feed. */
+  function remember(post) {
+    for (const old of skipped) if (!old.isConnected) skipped.delete(old);
+    skipped.add(post);
+    while (skipped.size > MAX_SKIPPED) skipped.delete(skipped.values().next().value);
   }
 
   function unlabel(post) {
@@ -173,6 +256,8 @@
   }
 
   chrome.runtime.onMessage.addListener((message) => {
+    if (message?.type === 'started') return pending.get(message.id)?.start();
+    if (message?.type === 'rated') return pending.get(message.id)?.finish(message);
     if (message?.type !== 'status') return;
     if (message.connected) resume();
     else paused = true;
@@ -196,27 +281,55 @@
    * @param {{ state: 'slop' | 'human' | 'unclear' | 'pending' | 'error', rating?: any, message?: string }} data
    */
   function label(post, data) {
+    // Only states this script knows get drawn; anything else is a reply we cannot show.
+    if (!(data.state in GLYPHS)) data = { state: 'error', message: 'Unexpected reply from the provider.' };
     post.classList.add('slop-radar-post');
     post.dataset.slopRadar = data.state;
     applyTheme(post);
     let badge = post.querySelector(':scope > .slop-radar-badge');
     if (!badge) {
-      badge = document.createElement('span');
+      // A button: it opens the popover, so it earns its tab stop, and touch users can tap it.
+      badge = document.createElement('button');
+      badge.type = 'button';
       badge.className = 'slop-radar-badge';
-      badge.tabIndex = 0;
-      badge.setAttribute('role', 'note');
+      badge.setAttribute('aria-expanded', 'false');
       badge.addEventListener('mouseenter', () => show(badge));
       badge.addEventListener('mouseleave', hideSoon);
       badge.addEventListener('focus', () => show(badge));
       badge.addEventListener('blur', hide);
+      // Hover and focus open the popover on their own; a click pins it open (so it survives the pointer
+      // leaving, and a tap on touch keeps it) and a second click closes it.
+      badge.addEventListener('click', (event) => {
+        event.stopPropagation(); // not a click on the post
+        if (pinned === badge) return hide();
+        show(badge);
+        pinned = badge;
+      });
       post.prepend(badge);
     }
+    const fresh = !badge.dataset.slopRadar;
     badge.dataset.slopRadar = data.state;
     badge.innerHTML = glyph(data.state, 12);
     badge.append(Object.assign(document.createElement('span'), { textContent: LABELS[data.state] }));
     badge.setAttribute('aria-label', `Slop Radar. ${describe(data)}`);
+    if (fresh) placeBadge(post, badge); // measured with its text in, once
     info.set(badge, data);
     if (current === badge) show(badge); // keep an open popover in step (Checking → verdict)
+  }
+
+  /**
+   * The tag sits top-right, left of where LinkedIn's "…" menu usually is. Cards vary (Follow buttons,
+   * wider menus), so measure the header's right-most control once and move further left if they meet.
+   */
+  function placeBadge(post, badge) {
+    const header = [...post.children].find((el) => el !== badge && !el.matches(BODY) && !el.querySelector(BODY));
+    const control = header?.lastElementChild;
+    if (!control) return;
+    const a = badge.getBoundingClientRect();
+    const b = control.getBoundingClientRect();
+    const apart = a.right <= b.left || a.left >= b.right || a.bottom <= b.top || a.top >= b.bottom;
+    if (!a.width || !b.width || apart) return;
+    badge.style.right = `${post.getBoundingClientRect().right - b.left + 8}px`;
   }
 
   // — Theme. LinkedIn's dark mode ignores the OS, so sample the card itself. —
@@ -244,7 +357,8 @@
 
   const POPOVER_CSS = `
     :host { all: initial; }
-    .pop { position: fixed; z-index: 2147483000; width: ${POPOVER_WIDTH}px; box-sizing: border-box; padding: 14px 16px;
+    .pop { position: fixed; z-index: 2147483000; min-width: ${POPOVER_WIDTH}px; max-width: min(360px, calc(100vw - 16px));
+      box-sizing: border-box; padding: 14px 16px;
       display: flex; flex-direction: column; gap: 12px; text-align: left;
       background: #f9f4ed; color: #201e1d; border-radius: 20px;
       box-shadow: 0 12px 32px rgb(46 43 37 / 28%), 0 0 0 1px rgb(46 43 37 / 8%);
@@ -254,18 +368,18 @@
     .g-human { color: #728157; } .g-slop { color: #b2622d; } .g-unclear, .g-pending, .g-error { color: #82796a; }
     .head { display: flex; align-items: center; gap: 8px; }
     .title { font-size: 15px; font-weight: 650; letter-spacing: -0.005em; }
-    .brand { margin-left: auto; font-size: 10px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: #645c50; }
+    .brand { margin-left: auto; font-size: 12px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: #645c50; }
     .reading, .group { display: flex; flex-direction: column; gap: 6px; }
     .meter { display: flex; gap: 2px; height: 8px; }
-    .meter div { flex-basis: 0; border-radius: 999px; }
+    .meter div { flex-basis: 0; border-radius: 999px; outline: 1px solid rgb(46 43 37 / 40%); outline-offset: -1px; }
     .nums { display: flex; justify-content: space-between; font-size: 12px; font-variant-numeric: tabular-nums; color: #645c50; }
     .nums .h { color: #3d472b; font-weight: 600; } .nums .s { color: #643312; font-weight: 600; }
     .signals { display: flex; flex-direction: column; gap: 8px; }
     .group { gap: 5px; }
-    .group-title { font-size: 11px; font-weight: 600; color: #645c50; }
+    .group-title { font-size: 12px; font-weight: 600; color: #645c50; }
     .sig { display: flex; align-items: center; gap: 8px; }
     .msg { color: #474238; }
-    .foot { padding-top: 10px; border-top: 1px solid rgb(46 43 37 / 12%); font-size: 11.5px; color: #645c50; }
+    .foot { padding-top: 10px; border-top: 1px solid rgb(46 43 37 / 12%); font-size: 12px; color: #645c50; }
     @keyframes spin { to { transform: rotate(360deg); } }
     .slop-radar-spin { transform-origin: 6px 6px; animation: spin 1.2s linear infinite; }
     @media (prefers-reduced-motion: reduce) { .slop-radar-spin { animation: none; } }
@@ -273,6 +387,7 @@
 
   let pop;
   let current = null;
+  let pinned = null; // the badge whose click is holding the popover open
   let hideTimer;
 
   function popover() {
@@ -280,6 +395,8 @@
     const host = document.createElement('div');
     host.id = 'slop-radar-popover';
     host.setAttribute('aria-hidden', 'true'); // the tag's aria-label already says all of this
+    // A click inside the popover must not move focus off the tag, or blur would close a pinned popover.
+    host.addEventListener('mousedown', (event) => event.preventDefault());
     const root = host.attachShadow({ mode: 'open' });
     root.innerHTML = `<style>${POPOVER_CSS}</style><div class="pop" role="tooltip" hidden></div>`;
     pop = root.querySelector('.pop');
@@ -291,7 +408,9 @@
 
   function show(badge) {
     clearTimeout(hideTimer);
+    if (current && current !== badge) current.setAttribute('aria-expanded', 'false');
     current = badge;
+    badge.setAttribute('aria-expanded', 'true');
     const el = popover();
     el.replaceChildren(...content(info.get(badge)));
     el.hidden = false;
@@ -300,16 +419,19 @@
     const height = el.offsetHeight;
     const above = rect.top - 6 - height;
     el.style.top = `${rect.bottom + 6 + height > innerHeight && above >= 0 ? above : rect.bottom + 6}px`;
-    el.style.left = `${Math.max(8, rect.right - POPOVER_WIDTH)}px`;
+    el.style.left = `${Math.max(8, rect.right - (el.offsetWidth || POPOVER_WIDTH))}px`;
   }
 
   function hide() {
     clearTimeout(hideTimer);
+    current?.setAttribute('aria-expanded', 'false');
     current = null;
+    pinned = null;
     if (pop) pop.hidden = true;
   }
 
   function hideSoon() {
+    if (pinned) return;
     clearTimeout(hideTimer);
     hideTimer = setTimeout(hide, HIDE_GRACE_MS);
   }

@@ -7,8 +7,9 @@
     <link rel="stylesheet" href="../ui/theme.css" />
     <link rel="stylesheet" href="options.css" />
     <script type="module" src="options.js"></script>
+    <script type="module" src="reveal.js"></script>
   </head>
-  <body data-next="Reload LinkedIn to see labels.">
+  <body data-next="Reload LinkedIn to see labels." data-app="Slop Radar">
     <main>
       <header class="brand">
         <div class="brand-row">
@@ -30,7 +31,7 @@
       </aside>
 
       <section id="connected" class="card" aria-labelledby="connected-title" hidden>
-        <h2 id="connected-title" tabindex="-1">Jev connection</h2>
+        <h2 id="connected-title">Jev connection</h2>
         <div class="connected-row">
           <svg width="22" height="22" viewBox="0 0 16 16" aria-hidden="true">
             <circle cx="8" cy="8" r="8" fill="var(--sr-ok-mark)" />
@@ -99,6 +100,9 @@
               required
             />
             <div class="key-buttons">
+              <button id="reveal" type="button" class="btn btn-secondary" aria-pressed="false" aria-controls="api-key">
+                Show key
+              </button>
               <button id="cancel" type="button" class="btn btn-secondary" hidden>Cancel</button>
               <button type="submit" class="btn btn-primary">Connect</button>
             </div>
@@ -114,5 +118,47 @@
         >.
       </footer>
     </main>
+
+    <!-- Status marks, cloned by options.js in front of each message so no state relies on colour alone. -->
+    <template data-icon="busy">
+      <svg width="18" height="18" viewBox="0 0 12 12" aria-hidden="true">
+        <circle cx="6" cy="6" r="4.6" fill="none" stroke="currentColor" stroke-opacity="0.3" stroke-width="1.5" />
+        <g class="spin">
+          <path
+            d="M6 1.4 A4.6 4.6 0 0 1 10.6 6"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.6"
+            stroke-linecap="round"
+          />
+        </g>
+      </svg>
+    </template>
+    <template data-icon="error">
+      <svg width="18" height="18" viewBox="0 0 16 16" aria-hidden="true">
+        <circle cx="8" cy="8" r="8" fill="var(--sr-err-mark)" />
+        <path d="M8 4.2v4.6" stroke="var(--sr-err-bg)" stroke-width="2" stroke-linecap="round" />
+        <circle cx="8" cy="11.6" r="1.1" fill="var(--sr-err-bg)" />
+      </svg>
+    </template>
+    <template data-icon="ok">
+      <svg width="18" height="18" viewBox="0 0 16 16" aria-hidden="true">
+        <circle cx="8" cy="8" r="8" fill="var(--sr-ok-mark)" />
+        <path
+          d="M4.8 8.2l2.1 2.1 4.3-4.5"
+          fill="none"
+          stroke="var(--sr-ok-bg)"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        />
+      </svg>
+    </template>
+    <template data-icon="neutral">
+      <svg width="18" height="18" viewBox="0 0 16 16" aria-hidden="true">
+        <circle cx="8" cy="8" r="7" fill="none" stroke="currentColor" stroke-width="1.6" />
+        <path d="M5.2 8h5.6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" />
+      </svg>
+    </template>
   </body>
 </html>

@@ -6,6 +6,6 @@ import { mountConnection } from '../lib/connection.js';
 if (matchMedia('(prefers-color-scheme: dark)').matches) document.body.dataset.slopRadarTheme = 'dark';
 
 const row = document.getElementById('connection-row');
-await mountConnection(document.getElementById('connection'), document.getElementById('open-settings'), (connected) =>
-  row.toggleAttribute('data-connected', connected),
-);
+await mountConnection(document.getElementById('connection'), document.getElementById('open-settings'), {
+  onChange: (connected) => row.toggleAttribute('data-connected', connected),
+});

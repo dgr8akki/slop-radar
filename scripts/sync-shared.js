@@ -6,9 +6,11 @@
  *   node scripts/sync-shared.js <ref>     copy from <ref> (sha, branch or tag) and pin its commit
  *   node scripts/sync-shared.js --check   exit 1 when any local copy differs from the pinned commit
  *
- * Files are read from raw.githubusercontent.com. With `--from <dir>` (or the
+ * Files are read from raw.githubusercontent.com. While the shared repo is
+ * private, set JEV_SHARED_TOKEN (or GITHUB_TOKEN) and files are read through
+ * the GitHub contents API with that token instead. With `--from <dir>` (or the
  * JEV_SHARED_DIR environment variable) they are read from a local clone with
- * `git show` instead, which also works offline.
+ * `git show`, which also works offline and needs no token.
  *
  * No dependencies: Node 22 only. This file is itself listed in SHARED.md.
  */
@@ -59,9 +61,10 @@ export function pinCommit(text, sha) {
 /**
  * Where upstream bytes come from: a local clone (git show) or GitHub raw files.
  *
- * @param {{ dir?: string, upstream: string, fetchImpl?: typeof fetch }} options
+ * @param {{ dir?: string, upstream: string, fetchImpl?: typeof fetch, token?: string }} options
+ *   `token` (a GitHub token) switches file reads to the contents API, which a private repo needs.
  */
-export function createSource({ dir, upstream, fetchImpl = (...args) => fetch(...args) }) {
+export function createSource({ dir, upstream, fetchImpl = (...args) => fetch(...args), token }) {
   if (dir) {
     const git = (...args) => execFileSync('git', ['-C', dir, ...args], { stdio: ['ignore', 'pipe', 'pipe'] });
     return {
@@ -73,13 +76,18 @@ export function createSource({ dir, upstream, fetchImpl = (...args) => fetch(...
 
   const [owner, repo] = new URL(upstream).pathname.replace(/^\/|\.git$|\/$/g, '').split('/');
   if (!owner || !repo) throw new Error(`Cannot read owner/repo from upstream URL ${upstream}`);
-  const get = async (url, headers) => {
-    const res = await fetchImpl(url, { headers });
-    if (!res.ok) throw new Error(`GET ${url} failed (HTTP ${res.status})`);
+  const auth = token ? { Authorization: `Bearer ${token}` } : {};
+  const get = async (url, headers = {}) => {
+    const res = await fetchImpl(url, { headers: { ...auth, ...headers } });
+    if (!res.ok) {
+      const hint =
+        res.status === 404 && !token ? ' If the upstream repo is private, set JEV_SHARED_TOKEN to a GitHub token.' : '';
+      throw new Error(`GET ${url} failed (HTTP ${res.status}).${hint}`);
+    }
     return res;
   };
   return {
-    describe: () => `${owner}/${repo} on GitHub`,
+    describe: () => `${owner}/${repo} on GitHub${token ? ' (authenticated)' : ''}`,
     async resolve(ref) {
       if (SHA.test(ref)) return ref;
       const res = await get(`https://api.github.com/repos/${owner}/${repo}/commits/${ref}`, {
@@ -90,7 +98,12 @@ export function createSource({ dir, upstream, fetchImpl = (...args) => fetch(...
       return sha;
     },
     async read(commit, path) {
-      const res = await get(`https://raw.githubusercontent.com/${owner}/${repo}/${commit}/${path}`);
+      // raw.githubusercontent.com does not take tokens reliably; the contents API serves the same bytes.
+      const res = token
+        ? await get(`https://api.github.com/repos/${owner}/${repo}/contents/${path}?ref=${commit}`, {
+            Accept: 'application/vnd.github.raw+json',
+          })
+        : await get(`https://raw.githubusercontent.com/${owner}/${repo}/${commit}/${path}`);
       return Buffer.from(await res.arrayBuffer());
     },
   };
@@ -119,7 +132,8 @@ export async function run(argv, { root = process.cwd(), env = process.env, fetch
   }
   const text = readFileSync(manifestPath, 'utf8');
   const { upstream, commit: pinned, files } = parseShared(text);
-  const source = createSource({ dir, upstream, fetchImpl });
+  const token = env.JEV_SHARED_TOKEN || env.GITHUB_TOKEN || undefined;
+  const source = createSource({ dir, upstream, fetchImpl, token });
 
   if (check) {
     if (!pinned) throw new Error(`${MANIFEST} pins no commit; run "node scripts/sync-shared.js <ref>" first.`);

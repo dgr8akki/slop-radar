@@ -36,9 +36,11 @@
   --btn-bg-hover: #7a3f16;
   --btn-bg-active: #643312;
   --btn-fg: #f5ead8;
+  --focus: #8c491a; /* the accent is under 3:1 on the card; this is 5.1:1 there, 5.7:1 on the page */
 
   --sr-link: #8c491a;
   --sr-muted: #645c50;
+  --sr-muted-strong: #5a5247; /* small print on the selected provider tile, whose tint eats contrast */
   --sr-sel: rgb(198 113 57 / 10%);
   --sr-note-bg: #e1eecc;
   --sr-note-fg: #3d472b;
@@ -70,9 +72,11 @@
     --btn-bg-hover: #f6a06b;
     --btn-bg-active: #ffc6a5;
     --btn-fg: #201e1d;
+    --focus: #d67f48;
 
     --sr-link: #ffc6a5;
     --sr-muted: #c0b6a5;
+    --sr-muted-strong: #c0b6a5;
     --sr-sel: rgb(214 127 72 / 14%);
     --sr-note-bg: #272e1b;
     --sr-note-fg: #e1eecc;
@@ -128,12 +132,29 @@ code {
   font-family: var(--font-mono);
 }
 
+/* Read by screen readers, not shown: "(opens in a new tab)" after outbound links. */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* The outbound-link mark options.js adds after link text. */
+a .external {
+  display: inline-block;
+  margin-left: 2px;
+  vertical-align: -1px;
+}
+
 :focus {
   outline: none;
 }
 
 :focus-visible {
-  outline: 2px solid var(--color-accent);
+  outline: 2px solid var(--focus);
   outline-offset: 2px;
 }
 
@@ -162,13 +183,19 @@ code {
   border-radius: var(--radius-pill);
   background: transparent;
   color: var(--color-text);
-  font: 14px/1.2 var(--font-heading);
+  font: 600 14px/1.2 var(--font-body); /* the display face stays for headings; labels need to be read fast */
   cursor: pointer;
 }
 
 .btn:disabled {
   opacity: 0.45;
   cursor: not-allowed;
+}
+
+/* The busy mark options.js clones into a button while a key check runs. */
+.btn > svg {
+  flex: none;
+  margin-right: 8px;
 }
 
 .btn-primary {
@@ -225,8 +252,8 @@ code {
   margin-top: 1px;
 }
 
-.status[data-tone='progress'],
-.status[data-tone='info'] {
+.status[data-tone='busy'],
+.status[data-tone='neutral'] {
   background: var(--sr-info-bg);
   color: var(--sr-info-fg);
   border: 1px solid var(--color-divider);

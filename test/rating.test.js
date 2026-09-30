@@ -15,13 +15,26 @@ const answers = (levels, signals = {}) => ({
   ...Object.fromEntries(Object.keys(SIGNALS).map((key) => [key, yesNo(signals[key] ?? 0)])),
 });
 
-/** An in-memory stand-in for chrome.storage.local. */
-function memoryStorage() {
-  const data = {};
+/** An in-memory stand-in for chrome.storage.local, counting round trips. */
+function memoryStorage(initial = {}) {
+  const data = structuredClone(initial);
+  const calls = { get: 0, set: 0, remove: 0 };
   return {
     data,
-    get: async (key) => (key in data ? { [key]: structuredClone(data[key]) } : {}),
-    set: async (items) => Object.assign(data, structuredClone(items)),
+    calls,
+    async get(key) {
+      calls.get += 1;
+      if (key === null) return structuredClone(data);
+      return key in data ? { [key]: structuredClone(data[key]) } : {};
+    },
+    async set(items) {
+      calls.set += 1;
+      Object.assign(data, structuredClone(items));
+    },
+    async remove(keys) {
+      calls.remove += 1;
+      for (const key of [keys].flat()) delete data[key];
+    },
   };
 }
 
@@ -68,21 +81,58 @@ describe('QUESTIONS', () => {
 });
 
 describe('createCache', () => {
-  it('stores ratings by text', async () => {
+  it('stores ratings by text: hit and miss', async () => {
     const cache = createCache(memoryStorage());
     await cache.set('post one', { verdict: 'human' });
     assert.deepEqual(await cache.get('post one'), { verdict: 'human' });
     assert.equal(await cache.get('post two'), undefined);
   });
 
-  it('keeps only the most recent entries', async () => {
+  it('writes one small entry per post instead of rewriting the whole map', async () => {
+    const storage = memoryStorage();
+    const cache = createCache(storage);
+    await cache.set('post one', { verdict: 'human' });
+    await cache.set('post two', { verdict: 'slop' });
+    const keys = Object.keys(storage.data);
+    assert.equal(keys.length, 2);
+    // The key carries the text length: a 32-bit hash collision then also needs equal-length texts.
+    assert.ok(keys.includes(`ratings:v4:${hash('post one')}:8`), keys.join());
+    for (const key of keys) assert.deepEqual(Object.keys(storage.data[key]), ['rating', 'at']);
+  });
+
+  it('trims to the most recent entries in batches, not on every write', async () => {
     let now = 0;
-    const cache = createCache(memoryStorage(), { max: 2, now: () => (now += 1) });
+    const storage = memoryStorage();
+    const cache = createCache(storage, { max: 2, trimEvery: 3, now: () => (now += 1) });
     await cache.set('a', { verdict: 'human' });
     await cache.set('b', { verdict: 'slop' });
-    await cache.set('c', { verdict: 'unclear' });
+    assert.equal(storage.calls.remove, 1, 'the old single-blob cache is cleared once');
+    assert.equal(storage.calls.get, 1, 'one full read on the first write, none on the second');
+    await cache.set('c', { verdict: 'unclear' }); // third write: trim
     assert.equal(await cache.get('a'), undefined);
+    assert.deepEqual(await cache.get('b'), { verdict: 'slop' });
     assert.deepEqual(await cache.get('c'), { verdict: 'unclear' });
+    assert.equal(Object.keys(storage.data).length, 2);
+  });
+
+  it('trims on its first write, so a short-lived worker still enforces the cap', async () => {
+    const full = Object.fromEntries(
+      Array.from({ length: 5 }, (_, i) => [`ratings:v4:k${i}:9`, { rating: { verdict: 'slop' }, at: i }]),
+    );
+    const storage = memoryStorage(full);
+    const cache = createCache(storage, { max: 3, trimEvery: 50, now: () => 100 });
+    await cache.set('fresh post', { verdict: 'human' });
+    const keys = Object.keys(storage.data);
+    assert.equal(keys.length, 3);
+    assert.ok(keys.includes('ratings:v4:k4:9') && !keys.includes('ratings:v4:k0:9'), 'oldest went first');
+    assert.deepEqual(await cache.get('fresh post'), { verdict: 'human' });
+  });
+
+  it('starts clean: drops the old single-blob cache and leaves other keys alone', async () => {
+    const storage = memoryStorage({ 'ratings:v3': { x: { rating: { verdict: 'slop' }, at: 1 } }, apiKey: 'vck_1' });
+    const cache = createCache(storage);
+    assert.equal(await cache.get('anything'), undefined);
+    assert.deepEqual(Object.keys(storage.data), ['apiKey']);
   });
 });
 
@@ -185,6 +235,25 @@ describe('createRater', () => {
     rater.reset(); // the key changed in settings
     await assert.rejects(rater.rate('fourth'), { status: 401 });
     assert.equal(jev.calls.length, 3);
+  });
+
+  it("tells the caller when a post's turn comes, and skips one cancelled while it waited", async () => {
+    const jev = fakeJev(() => slopAnswers);
+    const rater = createRater({ jev, cache: createCache(memoryStorage()) });
+    const order = [];
+    const first = rater.rate('first', { onStart: () => order.push('start first') });
+    const dropped = new AbortController();
+    const second = rater.rate('second', { signal: dropped.signal, onStart: () => order.push('start second') });
+    const third = rater.rate('third', { onStart: () => order.push('start third') });
+    dropped.abort();
+    await first;
+    await assert.rejects(second, { name: 'AbortError' });
+    await third;
+    assert.deepEqual(order, ['start first', 'start third']);
+    assert.deepEqual(
+      jev.calls.map((c) => c.state),
+      ['first', 'third'],
+    );
   });
 
   it('does not retry other errors', async () => {

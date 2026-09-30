@@ -1,6 +1,8 @@
 /* Tags on LinkedIn posts (the popup legend reuses these rules). Filled = verdict, outlined = none yet. */
 
 .slop-radar-badge {
+  all: unset; /* a <button> on LinkedIn: none of the page's button styles may leak in */
+
   --sr-bg: #f9f4ed;
   --sr-fg: #474238;
   --sr-mark: #82796a;
@@ -62,7 +64,7 @@
   --sr-fg: #645c50;
   --sr-mark: #82796a;
   --sr-ring: transparent;
-  --sr-edge: #a19786;
+  --sr-edge: #82796a; /* 4.4:1 on white; the lighter #a19786 read as nothing there */
 }
 
 .slop-radar-badge[data-slop-radar='pending'] {
@@ -143,7 +145,7 @@
 }
 
 .slop-radar-post[data-slop-radar='human'] {
-  --sr-rule: #8fa073;
+  --sr-rule: #728157; /* the badge mark: 4.3:1 on a white card, where #8fa073 was 2.8:1 */
 }
 
 .slop-radar-post[data-slop-radar-theme='dark'][data-slop-radar='slop'] {

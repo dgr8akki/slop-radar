@@ -93,33 +93,47 @@ export function toRating(answers) {
 }
 
 /**
- * Cache of ratings in extension storage, keyed by a hash of the post text and
- * trimmed to the most recent `max` entries.
+ * Cache of ratings in extension storage: one small entry per post, keyed by a
+ * hash of its text, trimmed in batches to the most recent `max`.
  *
- * @param {{ get: (key: string) => Promise<Record<string, any>>, set: (items: Record<string, any>) => Promise<void> }} storage
+ * @param {{ get: (key: string | null) => Promise<Record<string, any>>, set: (items: Record<string, any>) => Promise<void>, remove: (keys: string | string[]) => Promise<void> }} storage
  *   A `chrome.storage.local`-like area.
- * @param {{ max?: number, now?: () => number }} [options]
+ * @param {{ max?: number, trimEvery?: number, now?: () => number }} [options]
+ *   `trimEvery`: writes between trims, so the cap is approximate by that much and a write costs one `set`.
  */
-export function createCache(storage, { max = 2000, now = () => Date.now() } = {}) {
-  const KEY = 'ratings:v3'; // bump when the Rating shape or signal wording changes
+export function createCache(storage, { max = 2000, trimEvery = 50, now = () => Date.now() } = {}) {
+  const PREFIX = 'ratings:v4:'; // bump when the Rating shape, signal wording or storage layout changes
+  const LEGACY = 'ratings:v3'; // every rating in one object; rewriting it per post cost ~200 KB twice
+  // The length rules out the other post in a 32-bit collision, which would otherwise show its verdict.
+  const key = (text) => `${PREFIX}${hash(text)}:${text.length}`;
+  let writes = 0;
+  let cleaned;
+
+  /** Once per worker life: the old layout is not read, just removed. */
+  const clean = () => (cleaned ??= storage.remove(LEGACY));
+
+  async function trim() {
+    const entries = Object.entries(await storage.get(null)).filter(([k]) => k.startsWith(PREFIX));
+    if (entries.length <= max) return;
+    const oldest = entries.sort((a, b) => a[1].at - b[1].at).slice(0, entries.length - max);
+    await storage.remove(oldest.map(([k]) => k));
+  }
+
   return {
     /** @returns {Promise<Rating | undefined>} */
     async get(text) {
-      const all = (await storage.get(KEY))[KEY] ?? {};
-      return all[hash(text)]?.rating;
+      await clean();
+      const k = key(text);
+      return (await storage.get(k))[k]?.rating;
     },
     /** @param {string} text @param {Rating} rating */
     async set(text, rating) {
-      const all = (await storage.get(KEY))[KEY] ?? {};
-      all[hash(text)] = { rating, at: now() };
-      const keys = Object.keys(all);
-      if (keys.length > max) {
-        keys
-          .sort((a, b) => all[a].at - all[b].at)
-          .slice(0, keys.length - max)
-          .forEach((key) => delete all[key]);
-      }
-      await storage.set({ [KEY]: all });
+      await clean();
+      await storage.set({ [key(text)]: { rating, at: now() } });
+      // The counter lives in worker memory, so a worker that dies young would never trim: the first
+      // write of each worker life trims too.
+      writes += 1;
+      if (writes === 1 || writes % trimEvery === 0) await trim();
     },
   };
 }
@@ -171,9 +185,19 @@ export function createRater({
   }
 
   return {
-    /** @param {string} text @returns {Promise<Rating>} */
-    rate(text) {
-      const result = chain.then(() => rateNow(text));
+    /**
+     * @param {string} text
+     * @param {{ signal?: AbortSignal, onStart?: () => void }} [options]
+     *   `signal`: abort while queued and the post is skipped with an AbortError once its turn comes.
+     *   `onStart`: called when the post's turn comes, so a caller can time the request, not the queue.
+     * @returns {Promise<Rating>}
+     */
+    rate(text, { signal, onStart } = {}) {
+      const result = chain.then(() => {
+        if (signal?.aborted) throw Object.assign(new Error('Rating cancelled.'), { name: 'AbortError' });
+        onStart?.();
+        return rateNow(text);
+      });
       chain = result.catch(() => {}); // one failure must not stall the queue
       return result;
     },
@@ -184,7 +208,7 @@ export function createRater({
   };
 }
 
-/** djb2 hash, base-36. Stable across sessions; collisions are harmless (a re-rate). */
+/** djb2 hash, base-36. Stable across sessions. 32 bits collide now and then, so cache keys add the text length. */
 export function hash(text) {
   let h = 5381;
   for (let i = 0; i < text.length; i += 1) h = (h * 33) ^ text.charCodeAt(i);

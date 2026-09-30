@@ -1,13 +1,13 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
-import { JevError, PROVIDERS, createJevClient, maskKey } from '../src/lib/jev.js';
+import { JevError, PROVIDERS, createJevClient, maskKey, sessionPauseStore } from '../src/lib/jev.js';
 import { response } from './helpers.js';
 
 const body = { state: 'ping', questions: { ok: { type: 'boolean', instructions: 'Test?' } } };
 
 /** Client whose fetch replies with `replies` in order and records requests. */
-function client(replies, { key = 'vck_test', provider, now = () => 0, timeoutMs } = {}) {
+function client(replies, { key = 'vck_test', provider, now = () => 0, timeoutMs, pauseStore } = {}) {
   const requests = [];
   const sleeps = [];
   const jev = createJevClient({
@@ -15,6 +15,7 @@ function client(replies, { key = 'vck_test', provider, now = () => 0, timeoutMs 
     getProvider: () => provider,
     now,
     timeoutMs,
+    pauseStore,
     sleep: async (ms) => {
       sleeps.push(ms);
     },
@@ -190,6 +191,70 @@ describe('createJevClient', () => {
     await assert.rejects(client([html]).jev.evaluate(body), unexpected);
   });
 
+  it('reads a persisted pause and refuses without a request', async () => {
+    const store = { get: async () => 10_000, set: async () => {} };
+    const { jev, requests } = client([response(200, { answers: { ok: {} } })], { now: () => 0, pauseStore: store });
+    await assert.rejects(jev.evaluate(body), { status: 429, message: /10s/ });
+    assert.equal(requests.length, 0);
+    // An empty store means no pause.
+    const fresh = client([response(200, { answers: { ok: {} } })], {
+      pauseStore: { get: async () => undefined, set: async () => {} },
+    });
+    assert.deepEqual(await fresh.jev.evaluate(body), { ok: {} });
+  });
+
+  it('writes the pause after a 429 so a restarted worker still honours it', async () => {
+    const writes = [];
+    let saved;
+    const store = { get: async () => saved, set: async (until) => void writes.push((saved = until)) };
+    const first = client([response(429, {}, { 'retry-after': '20' })], { now: () => 1_000, pauseStore: store });
+    await assert.rejects(first.jev.evaluate(body), { status: 429 });
+    assert.deepEqual(writes, [21_000]);
+
+    // A new client (as after a service-worker restart) sharing the store refuses without asking the provider.
+    const second = client([response(200, { answers: { ok: {} } })], { now: () => 6_000, pauseStore: store });
+    await assert.rejects(second.jev.evaluate(body), { status: 429, message: /15s/ });
+    assert.equal(second.requests.length, 0);
+  });
+
+  it('keeps the pause in memory by default, per client', async () => {
+    const a = client([response(429, {}, { 'retry-after': '20' })]);
+    await assert.rejects(a.jev.evaluate(body), { status: 429 });
+    await assert.rejects(a.jev.evaluate(body), { status: 429 });
+    assert.equal(a.requests.length, 1);
+    const b = client([response(200, { answers: { ok: {} } })]);
+    assert.deepEqual(await b.jev.evaluate(body), { ok: {} });
+  });
+
+  it("never lets a broken pause store hide the provider's answer", async () => {
+    // A store that throws synchronously (not even a rejected promise) must be tolerated as well.
+    const sync = {
+      get: () => {
+        throw new Error('no storage.session');
+      },
+      set: () => {
+        throw new Error('no storage.session');
+      },
+    };
+    assert.deepEqual(await client([response(200, { answers: { ok: {} } })], { pauseStore: sync }).jev.evaluate(body), {
+      ok: {},
+    });
+    await assert.rejects(client([response(429, {})], { pauseStore: sync }).jev.evaluate(body), { status: 429 });
+
+    const broken = {
+      get: async () => {
+        throw new Error('storage gone');
+      },
+      set: async () => {
+        throw new Error('storage gone');
+      },
+    };
+    const ok = client([response(200, { answers: { ok: {} } })], { pauseStore: broken });
+    assert.deepEqual(await ok.jev.evaluate(body), { ok: {} });
+    const limited = client([response(429, {}, { 'retry-after': '20' })], { pauseStore: broken });
+    await assert.rejects(limited.jev.evaluate(body), { status: 429, message: /20s/ });
+  });
+
   it('explains rejected keys and exhausted budgets', async () => {
     await assert.rejects(client([response(401, {})]).jev.evaluate(body), { message: /key was rejected/ });
     await assert.rejects(client([response(402, {})]).jev.evaluate(body), { message: /budget is used up/ });
@@ -201,5 +266,45 @@ describe('createJevClient', () => {
       status: 403,
       message: 'Add a credit card to use AI Gateway.',
     });
+  });
+});
+
+describe('sessionPauseStore', () => {
+  /** A chrome.storage area double. */
+  function area(initial = {}) {
+    const data = { ...initial };
+    return {
+      data,
+      get: async (key) => (key in data ? { [key]: data[key] } : {}),
+      set: async (values) => void Object.assign(data, values),
+    };
+  }
+
+  it('reads and writes one key on a storage area, jev:pausedUntil by default', async () => {
+    const session = area();
+    const store = sessionPauseStore(session);
+    assert.equal(await store.get(), undefined);
+    await store.set(42_000);
+    assert.deepEqual(session.data, { 'jev:pausedUntil': 42_000 });
+    assert.equal(await store.get(), 42_000);
+  });
+
+  it('takes a custom key', async () => {
+    const session = area({ 'x:pause': 7 });
+    const store = sessionPauseStore(session, 'x:pause');
+    assert.equal(await store.get(), 7);
+  });
+
+  it('plugs straight into the client', async () => {
+    const session = area({ 'jev:pausedUntil': 30_000 });
+    const requests = [];
+    const jev = createJevClient({
+      getKey: () => 'vck_test',
+      now: () => 0,
+      pauseStore: sessionPauseStore(session),
+      fetchImpl: async () => void requests.push(1),
+    });
+    await assert.rejects(jev.evaluate(body), { status: 429, message: /30s/ });
+    assert.equal(requests.length, 0);
   });
 });
