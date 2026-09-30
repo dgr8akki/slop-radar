@@ -30,6 +30,13 @@
   --color-accent-active: #8c491a;
   --color-divider: rgb(32 30 29 / 16%);
 
+  /* Filled button. The accent itself is only 3:1 under cream text at 14px, so the button sits
+     two steps deeper; keep every state at 4.5:1 or better (test/theme.test.js checks). */
+  --btn-bg: #8c491a;
+  --btn-bg-hover: #7a3f16;
+  --btn-bg-active: #643312;
+  --btn-fg: #f5ead8;
+
   --sr-link: #8c491a;
   --sr-muted: #645c50;
   --sr-sel: rgb(198 113 57 / 10%);
@@ -58,6 +65,11 @@
     --color-accent-hover: #f6a06b;
     --color-accent-active: #ffc6a5;
     --color-divider: rgb(245 234 216 / 18%);
+
+    --btn-bg: #d67f48;
+    --btn-bg-hover: #f6a06b;
+    --btn-bg-active: #ffc6a5;
+    --btn-fg: #201e1d;
 
     --sr-link: #ffc6a5;
     --sr-muted: #c0b6a5;
@@ -160,16 +172,16 @@ code {
 }
 
 .btn-primary {
-  background: var(--color-accent);
-  color: var(--color-bg);
+  background: var(--btn-bg);
+  color: var(--btn-fg);
 }
 
 .btn-primary:hover:not(:disabled) {
-  background: var(--color-accent-hover);
+  background: var(--btn-bg-hover);
 }
 
 .btn-primary:active:not(:disabled) {
-  background: var(--color-accent-active);
+  background: var(--btn-bg-active);
 }
 
 .btn-secondary {

@@ -23,12 +23,17 @@ afterEach(() => dom?.window.close());
  * @param {string} body
  * @param {(message: any) => any} respond What the service worker replies.
  */
-function loadFeed(body, respond) {
+function loadFeed(body, respond, { runtimeId } = {}) {
   dom = new JSDOM(`<main>${body}</main>`, { runScripts: 'outside-only', url: 'https://www.linkedin.com/feed/' });
   const { window } = dom;
   const messages = [];
   const observed = [];
+  const timers = [];
   let callback;
+
+  // Waits of a second or more (worker retry, provider pause) are held for the test to fire.
+  const realSetTimeout = window.setTimeout.bind(window);
+  window.setTimeout = (fn, ms, ...args) => (ms >= 1000 ? timers.push({ fn, ms }) : realSetTimeout(fn, ms, ...args));
 
   window.IntersectionObserver = class {
     constructor(cb) {
@@ -38,12 +43,15 @@ function loadFeed(body, respond) {
       observed.push(el);
     }
   };
+  const listeners = [];
   window.chrome = {
     runtime: {
+      id: runtimeId,
       sendMessage: async (message) => {
         messages.push(message);
         return respond(message);
       },
+      onMessage: { addListener: (listener) => listeners.push(listener) },
     },
   };
   window.eval(SCRIPT);
@@ -52,6 +60,18 @@ function loadFeed(body, respond) {
     window,
     messages,
     observed,
+    timers,
+    /** Delivers a message from the service worker and waits for what it started. */
+    async receive(message) {
+      for (const listener of listeners) listener(message, {}, () => {});
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    },
+    card: () => window.document.querySelector('.slop-radar-card'),
+    /** Runs every held timer and waits for what it started. */
+    async fire() {
+      for (const { fn } of timers.splice(0)) fn();
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    },
     /** Simulates posts scrolling into view and waits for their labels. */
     async show(...posts) {
       callback(posts.map((target) => ({ target, isIntersecting: true })));
@@ -114,6 +134,19 @@ describe('content script', () => {
     assert.equal(pop.hidden, true);
   });
 
+  it('says exactly what is sent while a post is being checked', async () => {
+    const feed = loadFeed(post('a', LONG), () => new Promise(() => {})); // never answers
+    await feed.show(feed.post('a'));
+    const badge = feed.post('a').querySelector('.slop-radar-badge');
+    assert.equal(badge.textContent, 'Checking');
+    badge.dispatchEvent(new feed.window.FocusEvent('focus'));
+    const pop = feed.window.document.getElementById('slop-radar-popover').shadowRoot.querySelector('.pop');
+    assert.equal(
+      pop.querySelector('.foot').textContent,
+      "Only the post's text is sent, never the author's name or profile.",
+    );
+  });
+
   it('marks posts on a dark LinkedIn card so the tags step deeper', async () => {
     const feed = loadFeed(post('a', LONG), () => rating('human'));
     feed.window.document.body.style.backgroundColor = 'rgb(27, 31, 35)';
@@ -154,5 +187,127 @@ describe('content script', () => {
     });
     await feed.show(feed.post('a'));
     assert.match(feed.post('a').querySelector('.slop-radar-badge').getAttribute('aria-label'), /Reload the page/);
+    assert.equal(feed.timers.length, 0);
+  });
+
+  it('tries once more after a moment when the worker did not answer', async () => {
+    let calls = 0;
+    const feed = loadFeed(
+      post('a', LONG),
+      () => {
+        if ((calls += 1) === 1) throw new Error('The message port closed before a response was received.');
+        return rating('human');
+      },
+      { runtimeId: 'abc' },
+    );
+    await feed.show(feed.post('a'));
+    assert.equal(feed.post('a').dataset.slopRadar, 'pending');
+    assert.equal(feed.timers.length, 1);
+    assert.ok(feed.timers[0].ms >= 500 && feed.timers[0].ms <= 2000, `retry after ${feed.timers[0].ms} ms`);
+
+    await feed.fire();
+    assert.equal(feed.messages.length, 2);
+    assert.equal(feed.post('a').dataset.slopRadar, 'human');
+  });
+
+  it('does not ask for a reload when the worker fails twice, and lets the post be tried again', async () => {
+    const feed = loadFeed(
+      post('a', LONG),
+      () => {
+        throw new Error('The message port closed before a response was received.');
+      },
+      { runtimeId: 'abc' },
+    );
+    await feed.show(feed.post('a'));
+    await feed.fire();
+    const badge = feed.post('a').querySelector('.slop-radar-badge');
+    assert.equal(badge.textContent, 'Not rated');
+    assert.doesNotMatch(badge.getAttribute('aria-label'), /Reload/);
+    assert.equal(feed.timers.length, 0);
+
+    await feed.show(feed.post('a')); // scrolled past and back
+    assert.equal(feed.messages.length, 3);
+  });
+
+  it('shows one connect card instead of a "Not rated" badge per post when there is no key', async () => {
+    let connected = false;
+    const feed = loadFeed(post('a', LONG) + post('b', LONG) + post('c', LONG), (message) => {
+      if (message.type !== 'rate') return {};
+      return connected ? rating('human') : { error: 'Add your API key in settings.', code: 'no-key' };
+    });
+    await feed.show(feed.post('a'), feed.post('b'));
+
+    assert.equal(feed.window.document.querySelectorAll('.slop-radar-badge').length, 0, 'no badges');
+    assert.equal(feed.window.document.querySelectorAll('.slop-radar-post').length, 0, 'no card marks');
+    const cards = feed.window.document.querySelectorAll('.slop-radar-card');
+    assert.equal(cards.length, 1, 'one card');
+    const card = cards[0];
+    assert.equal(card.parentElement.firstElementChild, card, 'at the top of the feed');
+    assert.match(card.textContent, /Slop Radar isn't connected yet/);
+    assert.match(card.textContent, /two minutes, costs under a cent a week/);
+    assert.equal(card.getAttribute('aria-live'), null);
+    const connect = card.querySelector('button.slop-radar-connect');
+    assert.equal(connect.textContent, 'Connect Jev');
+
+    connect.click();
+    assert.deepEqual(JSON.parse(JSON.stringify(feed.messages.at(-1))), { type: 'open-options' });
+
+    const before = feed.messages.length;
+    await feed.show(feed.post('c'));
+    assert.equal(feed.messages.length, before, 'no more rate requests while there is no key');
+
+    connected = true;
+    await feed.receive({ type: 'status', connected: true });
+    assert.equal(feed.card(), null, 'card gone');
+    for (const key of ['a', 'b', 'c']) assert.equal(feed.post(key).dataset.slopRadar, 'human', `post ${key} rated`);
+    assert.equal(feed.messages.length, before + 3);
+  });
+
+  it('names a rejected key on the card, which can be dismissed for the visit', async () => {
+    const feed = loadFeed(post('a', LONG) + post('b', LONG), (message) =>
+      message.type === 'rate' ? { error: 'Your API key was rejected. Check it in settings.', code: 'bad-key' } : {},
+    );
+    await feed.show(feed.post('a'));
+    const card = feed.card();
+    assert.match(card.textContent, /key was rejected/);
+    assert.equal(card.querySelector('button.slop-radar-connect').textContent, 'Check the key');
+    assert.equal(feed.post('a').querySelector('.slop-radar-badge'), null);
+
+    card.querySelector('button[aria-label="Dismiss"]').click();
+    assert.equal(feed.card(), null);
+    await feed.show(feed.post('b'));
+    assert.equal(feed.card(), null, 'stays dismissed');
+    assert.equal(feed.messages.length, 1, 'still no rate requests');
+  });
+
+  it('re-rates posts left as "Not rated" once the key is fixed', async () => {
+    let broken = true;
+    const feed = loadFeed(post('a', LONG), () => (broken ? { error: 'Rating failed.' } : rating('slop')));
+    await feed.show(feed.post('a'));
+    assert.equal(feed.post('a').dataset.slopRadar, 'error');
+
+    broken = false;
+    await feed.receive({ type: 'status', connected: true });
+    assert.equal(feed.post('a').dataset.slopRadar, 'slop');
+    assert.equal(feed.messages.length, 2);
+  });
+
+  it('waits out a provider pause in the page, then asks again', async () => {
+    let calls = 0;
+    const feed = loadFeed(post('a', LONG) + post('b', LONG), () =>
+      (calls += 1) <= 2 ? { error: 'Jev is busy. Try again in 30s.', retryAfter: 30 } : rating('slop'),
+    );
+    await feed.show(feed.post('a'), feed.post('b'));
+    assert.equal(feed.post('a').dataset.slopRadar, 'pending', 'still checking, not "Not rated"');
+    assert.equal(feed.post('b').dataset.slopRadar, 'pending');
+    assert.deepEqual(
+      feed.timers.map((t) => t.ms),
+      [30_000, 30_000],
+    );
+
+    await feed.fire();
+    assert.equal(feed.messages.length, 4);
+    assert.equal(feed.post('a').dataset.slopRadar, 'slop');
+    assert.equal(feed.post('b').dataset.slopRadar, 'slop');
   });
 });

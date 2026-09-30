@@ -45,6 +45,19 @@ describe('toRating', () => {
     const rating = toRating(answers([0, 0, 0, 0.1, 0.9], { hook: 0.95, bait: 0.7, buzz: 0.4 }));
     assert.deepEqual(rating.signals, [SIGNALS.hook, SIGNALS.bait]);
   });
+
+  it('rejects a reply whose shape has drifted instead of reading undefined', () => {
+    const drift = { name: 'JevError', message: 'Unexpected reply from the provider.' };
+    const good = answers([0, 0, 0, 0.1, 0.9]);
+    assert.throws(() => toRating(undefined), drift);
+    assert.throws(() => toRating({}), drift);
+    assert.throws(() => toRating({ ...good, slop: undefined }), drift);
+    assert.throws(() => toRating({ ...good, slop: { type: 'score' } }), drift);
+    assert.throws(() => toRating({ ...good, slop: { type: 'score', probabilities: 'high' } }), drift);
+    assert.throws(() => toRating({ ...good, hook: undefined }), drift);
+    assert.throws(() => toRating({ ...good, bait: { type: 'boolean' } }), drift);
+    assert.ok(toRating(good) instanceof Object);
+  });
 });
 
 describe('QUESTIONS', () => {
@@ -116,6 +129,29 @@ describe('createRater', () => {
     assert.deepEqual(waits, [12_000]);
   });
 
+  it('hands long rate limits back instead of sleeping through them in the worker', async () => {
+    // Chrome stops an idle worker after ~30 s, taking the pending reply with it.
+    const jev = fakeJev(() => {
+      throw new JevError('busy', { status: 429, retryAfter: 30 });
+    });
+    const rater = createRater({ jev, cache: createCache(memoryStorage()), sleep: async () => assert.fail('no wait') });
+    await assert.rejects(rater.rate('first'), { status: 429, retryAfter: 30 });
+    // Later posts fail fast for the pause window rather than each paying the full retry budget.
+    await assert.rejects(rater.rate('second'), { status: 429, retryAfter: 30 });
+    assert.equal(jev.calls.length, 2);
+
+    const waits = [];
+    const capped = createRater({
+      jev,
+      cache: createCache(memoryStorage()),
+      sleep: async (ms) => waits.push(ms),
+      maxWaitMs: 40_000,
+      maxAttempts: 2,
+    });
+    await assert.rejects(capped.rate('third'), { status: 429 });
+    assert.deepEqual(waits, [30_000], 'waits when the cap allows it');
+  });
+
   it('gives up after repeated rate limits, without blocking later posts', async () => {
     let fail = true;
     const jev = fakeJev(() => {
@@ -126,6 +162,29 @@ describe('createRater', () => {
     await assert.rejects(rater.rate('first'), { status: 429 });
     fail = false;
     assert.equal((await rater.rate('second')).verdict, 'slop');
+  });
+
+  it('remembers a rejected or missing key for a minute instead of asking the provider per post', async () => {
+    let now = 0;
+    const jev = fakeJev(() => {
+      throw new JevError('Your API key was rejected. Check it in settings.', { status: 401 });
+    });
+    const cache = createCache(memoryStorage());
+    await cache.set('seen before', { verdict: 'human', slop: 0.1, human: 0.8, signals: [] });
+    const rater = createRater({ jev, cache, now: () => now });
+
+    await assert.rejects(rater.rate('first'), { status: 401 });
+    await assert.rejects(rater.rate('second'), { status: 401, message: /rejected/ });
+    assert.equal(jev.calls.length, 1, 'the second post did not reach the provider');
+    assert.equal((await rater.rate('seen before')).verdict, 'human', 'cached ratings are still served');
+
+    now = 61_000;
+    await assert.rejects(rater.rate('third'), { status: 401 });
+    assert.equal(jev.calls.length, 2, 'asked again once the minute was up');
+
+    rater.reset(); // the key changed in settings
+    await assert.rejects(rater.rate('fourth'), { status: 401 });
+    assert.equal(jev.calls.length, 3);
   });
 
   it('does not retry other errors', async () => {

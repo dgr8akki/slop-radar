@@ -7,6 +7,15 @@ All notable changes to this project are documented here. The format follows [Kee
 ### Changed
 
 - Slop Radar now requires Chrome 140 or newer, so the API key and rating cache stay out of the LinkedIn page's reach.
+- With no key, or one the provider rejects, the feed shows a single card with a Connect button instead of a "Not rated" tag on every post. Saving a key in settings picks rating up again in open LinkedIn tabs, including posts that were left unrated.
+
+### Fixed
+
+- The Connect button in settings and the popup now meets WCAG AA contrast in the light theme (5.7:1, was 3:1), on hover and when pressed too.
+- After Connect or Cancel in settings, keyboard focus moves to the connection card instead of being dropped on the page.
+- The settings page no longer saves a key as "Key works." when the provider answers with something that isn't a Jev reply, and says when the provider was busy rather than claiming the key was checked. Being offline now reads "Can't reach <host>" instead of "Failed to fetch".
+- A provider reply in an unexpected shape, or no connection, now shows a specific message on the tag rather than "Reload to try again", and rating failures are logged in the service worker.
+- Long provider pauses are waited out on the page instead of inside the service worker, which Chrome stops after 30 seconds; tags no longer end up as "Not rated" or ask for a reload when the worker was simply asleep.
 
 ## [1.2.0] - 2026-09-28
 

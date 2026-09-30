@@ -5,6 +5,8 @@
  * @module lib/rating
  */
 
+import { JevError } from './jev.js';
+
 /** The questions asked about every post, in one call. */
 export const QUESTIONS = {
   slop: {
@@ -71,6 +73,15 @@ const SIGNAL_THRESHOLD = 0.6;
  * @returns {Rating}
  */
 export function toRating(answers) {
+  // Read nothing until the shape is checked: a changed API or a proxy's stand-in body must not
+  // surface as a TypeError from deep inside this function.
+  const isRecord = (value) => typeof value === 'object' && value !== null;
+  const shaped =
+    isRecord(answers) &&
+    isRecord(answers.slop?.probabilities) &&
+    Object.keys(SIGNALS).every((key) => typeof answers[key]?.probability === 'number');
+  if (!shaped) throw new JevError('Unexpected reply from the provider.');
+
   const p = (level) => answers.slop.probabilities[level] ?? 0;
   const slop = p(3) + p(4);
   const human = p(0) + p(1);
@@ -115,28 +126,46 @@ export function createCache(storage, { max = 2000, now = () => Date.now() } = {}
 
 /**
  * Rates posts one at a time (TypeSafe rate-limits bursts, and this runs
- * passively while scrolling), waiting out rate limits instead of failing.
+ * passively while scrolling). Short rate limits are waited out here; longer
+ * ones are thrown with `retryAfter` so the caller can come back later.
  *
  * @param {object} deps
  * @param {import('./jev.js').JevClient} deps.jev
  * @param {ReturnType<typeof createCache>} deps.cache
  * @param {(ms: number) => Promise<void>} [deps.sleep]
  * @param {number} [deps.maxAttempts]
+ * @param {number} [deps.maxWaitMs] Longest pause to sit through before giving the wait back to the caller.
+ * @param {number} [deps.authPauseMs] How long a missing or rejected key is taken as read before asking again.
+ * @param {() => number} [deps.now]
  */
-export function createRater({ jev, cache, sleep = (ms) => new Promise((r) => setTimeout(r, ms)), maxAttempts = 3 }) {
+export function createRater({
+  jev,
+  cache,
+  sleep = (ms) => new Promise((r) => setTimeout(r, ms)),
+  maxAttempts = 3,
+  maxWaitMs = 20_000,
+  authPauseMs = 60_000,
+  now = () => Date.now(),
+}) {
   let chain = Promise.resolve();
+  let auth = null; // { error, until }: the last 401, so a feed of posts costs one round trip, not one each
 
   async function rateNow(text) {
     const cached = await cache.get(text);
     if (cached) return cached;
+    if (auth && now() < auth.until) throw auth.error;
     for (let attempt = 1; ; attempt += 1) {
       try {
         const rating = toRating(await jev.evaluate({ state: text, questions: QUESTIONS }));
         await cache.set(text, rating);
         return rating;
       } catch (error) {
-        if (!error.busy || attempt === maxAttempts) throw error;
-        await sleep(Math.min(error.retryAfter || 5, 60) * 1000);
+        if (error.status === 401) auth = { error, until: now() + authPauseMs };
+        // Chrome stops an idle service worker after about 30 s and drops the pending reply with it, so
+        // a long pause is not slept through: the error carries retryAfter and the page asks again.
+        const waitMs = (error.retryAfter || 5) * 1000;
+        if (!error.busy || attempt === maxAttempts || waitMs > maxWaitMs) throw error;
+        await sleep(waitMs);
       }
     }
   }
@@ -147,6 +176,10 @@ export function createRater({ jev, cache, sleep = (ms) => new Promise((r) => set
       const result = chain.then(() => rateNow(text));
       chain = result.catch(() => {}); // one failure must not stall the queue
       return result;
+    },
+    /** Forgets a remembered key failure; call when the key or provider changes. */
+    reset() {
+      auth = null;
     },
   };
 }

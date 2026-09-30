@@ -153,3 +153,99 @@
 .slop-radar-post[data-slop-radar-theme='dark'][data-slop-radar='human'] {
   --sr-rule: #aebf92;
 }
+
+/* — Connect card: shown once at the top of the feed while there is no working key — */
+
+.slop-radar-card {
+  --sr-bg: #f9f4ed;
+  --sr-fg: #201e1d;
+  --sr-muted: #645c50;
+  --sr-ring: #dcd3c4;
+  --sr-btn-bg: #8c491a;
+  --sr-btn-bg-hover: #643312;
+  --sr-btn-fg: #f9f4ed;
+  --sr-focus: #201e1d;
+
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  box-sizing: border-box;
+  margin: 0 0 8px;
+  padding: 12px 12px 12px 16px;
+  border-radius: 12px;
+  background: var(--sr-bg);
+  box-shadow: inset 0 0 0 1px var(--sr-ring);
+  color: var(--sr-fg);
+  font:
+    14px/1.4 system-ui,
+    -apple-system,
+    'Segoe UI',
+    Roboto,
+    sans-serif;
+}
+
+.slop-radar-card-text {
+  flex: 1 1 220px;
+  margin: 0;
+  font-weight: 600;
+}
+
+.slop-radar-card-aside {
+  color: var(--sr-muted);
+  font-weight: 400;
+}
+
+.slop-radar-card button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 32px;
+  border: 0;
+  border-radius: 999px;
+  font: inherit;
+  cursor: pointer;
+}
+
+.slop-radar-card button:focus-visible {
+  outline: 2px solid var(--sr-focus);
+  outline-offset: 2px;
+}
+
+.slop-radar-connect {
+  padding: 0 14px;
+  background: var(--sr-btn-bg);
+  color: var(--sr-btn-fg);
+  font-weight: 600;
+}
+
+.slop-radar-connect:hover {
+  background: var(--sr-btn-bg-hover);
+}
+
+.slop-radar-dismiss {
+  width: 32px;
+  padding: 0;
+  background: transparent;
+  color: var(--sr-muted);
+}
+
+.slop-radar-dismiss:hover {
+  background: rgb(32 30 29 / 8%);
+  color: var(--sr-fg);
+}
+
+.slop-radar-card[data-slop-radar-theme='dark'] {
+  --sr-bg: #2e2b25;
+  --sr-fg: #f5ead8;
+  --sr-muted: #c0b6a5;
+  --sr-ring: #474238;
+  --sr-btn-bg: #ffc6a5;
+  --sr-btn-bg-hover: #f6a06b;
+  --sr-btn-fg: #201e1d;
+  --sr-focus: #f5ead8;
+}
+
+.slop-radar-card[data-slop-radar-theme='dark'] .slop-radar-dismiss:hover {
+  background: rgb(245 234 216 / 12%);
+}

@@ -15,6 +15,8 @@
   const REGROW = 1.3; // re-rate when "… more" reveals 30% more text
   const SCAN_MS = 1500;
   const HIDE_GRACE_MS = 150; // lets the pointer travel from the tag into the popover
+  const RETRY_MS = 1000; // a worker woken by the message sometimes drops that first reply
+  const MAX_PAUSE_S = 60; // longest the page waits on a provider pause before asking again
   const POPOVER_WIDTH = 288;
   const HUMAN_SIGNALS = ['Concrete first-hand details']; // SIGNALS.specific in lib/rating.js
 
@@ -63,7 +65,8 @@
   scan();
   setInterval(scan, SCAN_MS);
 
-  async function check(post) {
+  async function check(post, retried = false) {
+    if (paused) return skipped.add(post); // rated when a key arrives; see resume()
     const text = (post.querySelector(BODY)?.innerText ?? post.querySelector(BODY)?.textContent ?? '').trim();
     const ratedLength = Number(post.dataset.slopRadarLength) || 0;
     if (text.length < MIN_CHARS || text.length < ratedLength * REGROW) return;
@@ -74,12 +77,106 @@
     try {
       response = await chrome.runtime.sendMessage({ type: 'rate', text });
     } catch {
-      response = { error: 'Slop Radar was updated. Reload the page to rate posts again.' };
+      // No runtime id means the extension was updated and this script is orphaned. Otherwise the
+      // worker was asleep and the port closed before it answered; one more try after a moment.
+      if (!chrome.runtime?.id) {
+        return label(post, { state: 'error', message: 'Slop Radar was updated. Reload the page to rate posts again.' });
+      }
+      if (!retried) return setTimeout(() => recheck(post, true), RETRY_MS);
+      post.dataset.slopRadarLength = '0'; // so scrolling past and back tries again
+      return label(post, { state: 'error', message: "Slop Radar didn't answer. Scroll past and back to try again." });
     }
+    if (response?.retryAfter) {
+      return setTimeout(() => recheck(post), Math.min(response.retryAfter, MAX_PAUSE_S) * 1000);
+    }
+    if (response?.code === 'no-key' || response?.code === 'bad-key') return pause(post, response.code);
     if (!response || response.error)
       return label(post, { state: 'error', message: response?.error ?? 'Rating failed.' });
     label(post, { state: response.rating.verdict, rating: response.rating });
   }
+
+  /** Rates the post again as if it had just scrolled into view. */
+  function recheck(post, retried = false) {
+    post.dataset.slopRadarLength = '0';
+    check(post, retried);
+  }
+
+  // — No working key: one card at the top of the feed, not a "Not rated" tag on every post. —
+
+  let paused = false;
+  const skipped = new Set(); // posts that came into view while paused
+  let card = null;
+  let dismissed = false;
+
+  const CARD_COPY = {
+    'no-key': {
+      text: "Slop Radar isn't connected yet.",
+      button: 'Connect Jev',
+      aside: 'two minutes, costs under a cent a week.',
+    },
+    'bad-key': {
+      text: "Slop Radar's API key was rejected by the provider.",
+      button: 'Check the key',
+      aside: 'posts stay unlabelled until it works.',
+    },
+  };
+
+  function pause(post, code) {
+    paused = true;
+    unlabel(post);
+    skipped.add(post);
+    if (!card && !dismissed) showCard(post, code);
+  }
+
+  function unlabel(post) {
+    const badge = post.querySelector(':scope > .slop-radar-badge');
+    if (badge && current === badge) hide();
+    badge?.remove();
+    post.classList.remove('slop-radar-post');
+    delete post.dataset.slopRadar;
+    delete post.dataset.slopRadarLength;
+  }
+
+  function showCard(post, code) {
+    const copy = CARD_COPY[code];
+    card = document.createElement('div');
+    card.className = 'slop-radar-card';
+    const text = el('slop-radar-card-text', copy.text, 'p');
+    text.append(' ', el('slop-radar-card-aside', copy.aside, 'span'));
+    const connect = el('slop-radar-connect', copy.button, 'button');
+    connect.type = 'button';
+    connect.addEventListener('click', () => chrome.runtime.sendMessage({ type: 'open-options' }).catch(() => {}));
+    const dismiss = el('slop-radar-dismiss', undefined, 'button');
+    dismiss.type = 'button';
+    dismiss.setAttribute('aria-label', 'Dismiss');
+    dismiss.innerHTML =
+      '<svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M2.5 2.5l7 7M9.5 2.5l-7 7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>';
+    dismiss.addEventListener('click', () => {
+      dismissed = true;
+      card.remove();
+      card = null;
+    });
+    card.append(text, connect, dismiss);
+    applyTheme(card);
+    const first = document.querySelector(POST) ?? post;
+    first.parentElement.insertBefore(card, first);
+  }
+
+  /** A key was saved: rate what was skipped, and anything left as "Not rated". */
+  function resume() {
+    paused = false;
+    card?.remove();
+    card = null;
+    const stale = document.querySelectorAll('.slop-radar-post[data-slop-radar="error"]');
+    for (const post of new Set([...skipped, ...stale])) recheck(post);
+    skipped.clear();
+  }
+
+  chrome.runtime.onMessage.addListener((message) => {
+    if (message?.type !== 'status') return;
+    if (message.connected) resume();
+    else paused = true;
+  });
 
   const pct = (p) => Math.round(p * 100);
 
@@ -140,7 +237,7 @@
   }
   new MutationObserver(() => {
     dark = undefined;
-    document.querySelectorAll('.slop-radar-post').forEach(applyTheme);
+    document.querySelectorAll('.slop-radar-post, .slop-radar-card').forEach(applyTheme);
   }).observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
 
   // — Popover: one shared element in a shadow root on <body>, so card overflow can't clip it. —
@@ -294,7 +391,7 @@
     }
 
     const foot = {
-      pending: 'Only the post’s text is sent. Never names or profiles.',
+      pending: "Only the post's text is sent, never the author's name or profile.",
       error: 'Nothing is labelled until rating works again.',
     };
     parts.push(el('foot', foot[state] ?? 'Judges writing style, not who wrote it.'));
