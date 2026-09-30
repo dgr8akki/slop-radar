@@ -108,6 +108,17 @@ describe('popup markup', () => {
     assert.equal(document.querySelectorAll('main').length, 1);
   });
 
+  it('declares both colour schemes and a description in the head', () => {
+    assert.equal(document.querySelector('meta[name="color-scheme"]')?.content, 'light dark');
+    assert.match(document.querySelector('meta[name="description"]')?.content ?? '', /Slop Radar/);
+    assert.equal(document.querySelector('meta[name="theme-color"]'), null);
+  });
+
+  it('uses the same tag wording as the feed in the legend', () => {
+    const tags = [...document.querySelectorAll('.legend .slop-radar-badge')].map((b) => b.textContent.trim());
+    assert.deepEqual(tags, ['Human', 'Unclear', 'Reads like AI']);
+  });
+
   it('names the connection section with a heading screen readers can reach', () => {
     const section = document.getElementById('connection-row');
     const heading = document.getElementById(section.getAttribute('aria-labelledby'));

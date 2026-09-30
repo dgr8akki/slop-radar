@@ -221,7 +221,7 @@ describe('service worker', () => {
 
     const broken = await load({ store: { apiKey: 'vck_test_key_1234567890' }, brokenCache: true });
     const other = await ask(broken, { type: 'rate', text: TEXT });
-    assert.deepEqual(other.reply, { error: 'Rating failed. It will be tried again later.' });
+    assert.deepEqual(other.reply, { error: "Couldn't rate this one. It'll retry when it scrolls back into view." });
     assert.ok(logged[1][0] instanceof TypeError);
   });
 

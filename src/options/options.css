@@ -33,7 +33,7 @@ main {
   gap: 12px;
   align-items: flex-start;
   padding: 14px 18px;
-  border-radius: 24px;
+  border-radius: 10px;
   background: var(--sr-note-bg);
   color: var(--sr-note-fg);
   font-size: 14px;
@@ -50,7 +50,7 @@ main {
   flex-direction: column;
   gap: 20px;
   padding: 26px 28px;
-  border-radius: 32px;
+  border-radius: 10px;
   background: var(--color-surface);
 }
 
@@ -97,7 +97,7 @@ main {
   font-size: 14px;
 }
 
-/* — provider choice — */
+/* Provider choice */
 .providers {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -121,7 +121,7 @@ main {
   min-height: 44px;
   padding: 14px 16px;
   border: 1.5px solid var(--sr-muted);
-  border-radius: 22px;
+  border-radius: 10px;
   cursor: pointer;
 }
 
@@ -182,7 +182,7 @@ main {
   color: var(--sr-muted-strong);
 }
 
-/* — setup steps — */
+/* Setup steps */
 .steps {
   display: flex;
   flex-direction: column;
@@ -217,7 +217,7 @@ main {
   font-weight: 600;
 }
 
-/* — key field — */
+/* Key field */
 .field label {
   display: block;
   margin-bottom: 5px;

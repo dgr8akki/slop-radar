@@ -3,20 +3,25 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light dark" />
+    <meta
+      name="description"
+      content="Slop Radar settings: connect a TypeSafe or Vercel AI Gateway key to label AI slop on LinkedIn."
+    />
     <title>Slop Radar settings</title>
     <link rel="stylesheet" href="../ui/theme.css" />
     <link rel="stylesheet" href="options.css" />
     <script type="module" src="options.js"></script>
     <script type="module" src="reveal.js"></script>
   </head>
-  <body data-next="Reload LinkedIn to see labels." data-app="Slop Radar">
+  <body data-next="Open your LinkedIn feed and scroll; labels appear as posts come into view." data-app="Slop Radar">
     <main>
       <header class="brand">
         <div class="brand-row">
           <img src="../icons/icon-128.png" width="44" height="44" alt="" />
           <h1>Slop Radar</h1>
         </div>
-        <p>Labels LinkedIn posts as human, unclear or AI slop as you scroll.</p>
+        <p>Tags posts in your LinkedIn feed as Human, Unclear or Reads like AI while you scroll.</p>
       </header>
 
       <aside class="note">
@@ -25,8 +30,8 @@
           <path d="M6 1.4 A4.6 4.6 0 0 1 6 10.6 Z" fill="currentColor" />
         </svg>
         <p>
-          It judges writing style, not authorship. No tool can prove a post was AI-written, and a person writing in
-          LinkedIn’s house style will be labelled slop too. Read the labels as a hint, not a verdict on anyone.
+          It rates style, not who wrote it. Nothing can prove a post came from a model, and plenty of people write in
+          LinkedIn house style. Treat the tag as a hint.
         </p>
       </aside>
 
@@ -59,10 +64,7 @@
         <div class="intro">
           <h2 id="form-title">Connect Jev</h2>
           <p id="current" class="muted" hidden></p>
-          <p>
-            Slop Radar calls Jev with your own API key, so you pay your provider directly. A heavy scrolling session
-            costs well under a cent.
-          </p>
+          <p>You bring your own key. An evening of scrolling costs less than a cent.</p>
         </div>
 
         <fieldset class="providers">
@@ -72,7 +74,7 @@
             <span class="dot" aria-hidden="true"></span>
             <span class="option-text">
               <strong>Vercel AI Gateway</strong>
-              <small>Billed to your Vercel account, with spend limits.</small>
+              <small>Uses your Vercel account.</small>
             </span>
           </label>
           <label class="option">
@@ -80,7 +82,7 @@
             <span class="dot" aria-hidden="true"></span>
             <span class="option-text">
               <strong>TypeSafe</strong>
-              <small>Jev direct from its makers, billed by TypeSafe.</small>
+              <small>Uses your TypeSafe account.</small>
             </span>
           </label>
         </fieldset>
@@ -112,7 +114,7 @@
       </form>
 
       <footer class="muted">
-        Your key is stored only in this browser and sent only to <code id="host"></code>. See the
+        Stored locally. Only <code id="host"></code> ever sees it. See the
         <a href="https://github.com/dgr8akki/slop-radar/blob/main/PRIVACY.md" target="_blank" rel="noreferrer"
           >privacy policy</a
         >.

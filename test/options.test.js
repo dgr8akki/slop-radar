@@ -101,7 +101,7 @@ describe('settings page: checking a key', () => {
     assert.equal(page.chrome.store.provider, 'vercel');
     assert.equal(page.$('key-form').hidden, true);
     assert.deepEqual(status(page.$, 'connected-status'), {
-      text: 'Key works. Reload LinkedIn to see labels.',
+      text: 'Key works. Open your LinkedIn feed and scroll; labels appear as posts come into view.',
       tone: 'ok',
     });
   });

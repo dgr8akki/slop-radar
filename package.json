@@ -2,7 +2,7 @@
   "name": "slop-radar",
   "version": "1.2.0",
   "private": true,
-  "description": "Chrome extension that labels LinkedIn posts as human or AI slop, powered by Jev.",
+  "description": "Chrome extension that tags posts in your LinkedIn feed by how much they read like generic AI writing.",
   "type": "module",
   "license": "MIT",
   "author": "Aakash Pahuja",
@@ -21,7 +21,7 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "check": "npm run lint && npm run format:check && npm test",
-    "eval": "node --env-file-if-exists=.env evals/rating.eval.js",
+    "eval": "node --env-file-if-exists=.env test/live/rating.js",
     "icons": "node scripts/render-icons.js",
     "package": "node scripts/package.js"
   },

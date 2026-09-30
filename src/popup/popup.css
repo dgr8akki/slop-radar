@@ -57,44 +57,44 @@ main {
   color: var(--sr-muted);
 }
 
+/* One plain line: provider, masked key, Change. No tile, no check disc. */
 .connection {
   display: flex;
-  flex-direction: column;
-  gap: 10px;
-  padding: 12px 14px;
-  border-radius: 20px;
-  background: var(--color-surface);
+  align-items: center;
+  gap: 8px;
+  padding-top: 6px;
+  border-top: 1px solid var(--color-divider);
   font-size: 13px;
   line-height: 1.4;
 }
 
 .connection .mark {
   display: none;
-  flex: none;
+}
+
+.connection #connection {
+  flex: 1;
+  min-width: 0;
+}
+
+.connection .mono {
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+
+.connection .mono::before {
+  content: ' · ';
+  font-family: var(--font-body);
 }
 
 .connection .btn {
-  width: 100%;
+  flex: none;
+  min-height: 32px;
+  padding: 0 12px;
 }
 
-.connection[data-connected] {
-  flex-direction: row;
-  align-items: center;
-}
-
-.connection[data-connected] .mark {
-  display: block;
-}
-
-.connection[data-connected] #connection {
-  flex: 1;
-  min-width: 0;
-  display: flex;
+.connection:not([data-connected]) {
   flex-direction: column;
-  line-height: 1.35;
-}
-
-.connection[data-connected] .btn {
-  width: auto;
-  padding: 0 16px;
+  align-items: stretch;
+  gap: 10px;
 }

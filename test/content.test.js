@@ -136,6 +136,14 @@ describe('popover stylesheet', () => {
     assert.doesNotMatch(css, /\.pop \{[^}]*[^-]width: /);
   });
 
+  it('takes its colours from the shared custom properties, not its own hex values', () => {
+    assert.doesNotMatch(css, /#[0-9a-f]{3,8}\b/i);
+    const content = readFileSync(new URL('../src/content/content.css', import.meta.url), 'utf8');
+    for (const name of [...new Set(css.match(/--slop-radar-[\w-]+/g))]) {
+      assert.match(content, new RegExp(`${name}:`), `${name} is defined in content.css`);
+    }
+  });
+
   it('outlines each meter segment so adjacent shares do not rely on hue alone', () => {
     assert.match(css, /\.meter div \{[^}]*outline: 1px solid rgb\(46 43 37 \/ 40%\)/);
   });
@@ -203,10 +211,10 @@ describe('content script', () => {
     assert.deepEqual(JSON.parse(JSON.stringify(feed.messages)), [{ type: 'rate', id: 1, text: LONG }]);
     assert.equal(feed.post('a').dataset.slopRadar, 'slop');
     const badge = feed.post('a').querySelector('.slop-radar-badge');
-    assert.equal(badge.textContent, 'AI slop');
+    assert.equal(badge.textContent, 'Reads like AI');
     assert.equal(
       badge.getAttribute('aria-label'),
-      'Slop Radar. AI slop: 90% slop, 5% human. Signals: Generic hook, Engagement bait.',
+      'Slop Radar. Reads like AI: 90% slop, 5% human. Signals: Generic hook, Engagement bait.',
     );
     assert.equal(badge.tagName, 'BUTTON', 'a control, since it opens something');
     assert.equal(badge.getAttribute('type'), 'button');
@@ -277,7 +285,7 @@ describe('content script', () => {
     assert.equal(badge.getAttribute('aria-expanded'), 'false');
   });
 
-  it('explains the tag in a popover on focus, grouped by direction, and closes on Escape', async () => {
+  it('popover on focus, Escape closes', async () => {
     const feed = loadFeed(post('a', LONG), () =>
       rating('unclear', { signals: ['Generic hook', 'Concrete first-hand details'] }),
     );
@@ -297,7 +305,7 @@ describe('content script', () => {
     assert.equal(pop.hidden, true);
   });
 
-  it('times the request from the worker starting it, not from queueing, and gives up after 30 s', async () => {
+  it('30 s from the worker starting, not from queueing', async () => {
     const feed = loadFeed(post('a', LONG) + post('b', LONG), () => ({ queued: true }), { runtimeId: 'abc' });
     await feed.show(feed.post('a'), feed.post('b'));
     assert.equal(feed.post('a').dataset.slopRadar, 'pending');
@@ -332,7 +340,7 @@ describe('content script', () => {
     assert.equal(feed.messages.filter((m) => m.type === 'rate').length, 3);
   });
 
-  it('cancels a queued post that scrolls away before its turn, and asks again when it returns', async () => {
+  it('cancel on scroll-away, ask again on return', async () => {
     const feed = loadFeed(post('a', LONG), () => ({ queued: true }), { runtimeId: 'abc' });
     await feed.show(feed.post('a'));
     await feed.leave(feed.post('a'));
@@ -463,12 +471,17 @@ describe('content script', () => {
     assert.equal(feed.post('a').querySelectorAll('.slop-radar-badge').length, 1, 'one badge per post');
   });
 
-  it('shows errors on the label instead of failing silently', async () => {
+  it('error tag, then asks again on re-entry', async () => {
     const feed = loadFeed(post('a', LONG), () => ({ error: 'Add your AI Gateway API key in settings.' }));
     await feed.show(feed.post('a'));
     const badge = feed.post('a').querySelector('.slop-radar-badge');
     assert.equal(badge.textContent, 'Not rated');
     assert.equal(badge.getAttribute('aria-label'), 'Slop Radar. Not rated. Add your AI Gateway API key in settings.');
+    badge.dispatchEvent(new feed.window.FocusEvent('focus'));
+    const pop = feed.window.document.getElementById('slop-radar-popover').shadowRoot.querySelector('.pop');
+    assert.equal(pop.querySelector('.foot').textContent, 'Labels resume automatically when rating works again.');
+    await feed.show(feed.post('a'));
+    assert.equal(feed.messages.filter((m) => m.type === 'rate').length, 2, 'asked again on re-entry');
   });
 
   it('asks for a reload after the extension is updated', async () => {
@@ -500,7 +513,7 @@ describe('content script', () => {
     assert.equal(feed.post('a').dataset.slopRadar, 'human');
   });
 
-  it('does not ask for a reload when the worker fails twice, and lets the post be tried again', async () => {
+  it('two dropped ports: no reload advice', async () => {
     const feed = loadFeed(
       post('a', LONG),
       () => {

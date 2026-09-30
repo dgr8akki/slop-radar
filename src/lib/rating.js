@@ -1,13 +1,8 @@
-/**
- * Rates a LinkedIn post: how much it reads like generic AI "slop", and which
- * telltale signals it shows. One Jev call per post, cached by text.
- *
- * @module lib/rating
- */
+// Rates a LinkedIn post: how much it reads like generic AI "slop", and which signals it shows.
+// One Jev call per post, cached by text.
 
 import { JevError } from './jev.js';
 
-/** The questions asked about every post, in one call. */
 export const QUESTIONS = {
   slop: {
     type: 'score',
@@ -43,7 +38,6 @@ export const QUESTIONS = {
   },
 };
 
-/** Tooltip wording for each signal. */
 export const SIGNALS = {
   hook: 'Generic hook',
   format: 'Broetry or emoji bullets',
@@ -52,8 +46,7 @@ export const SIGNALS = {
   specific: 'Concrete first-hand details', // content.js groups this one under "Pointing to human"
 };
 
-/** A side of the scale needs this much probability to decide the verdict. */
-export const VERDICT_THRESHOLD = 0.6;
+export const VERDICT_THRESHOLD = 0.6; // one side of the scale needs this much to decide
 const SIGNAL_THRESHOLD = 0.6;
 
 /**
@@ -92,15 +85,8 @@ export function toRating(answers) {
   return { verdict, slop, human, signals };
 }
 
-/**
- * Cache of ratings in extension storage: one small entry per post, keyed by a
- * hash of its text, trimmed in batches to the most recent `max`.
- *
- * @param {{ get: (key: string | null) => Promise<Record<string, any>>, set: (items: Record<string, any>) => Promise<void>, remove: (keys: string | string[]) => Promise<void> }} storage
- *   A `chrome.storage.local`-like area.
- * @param {{ max?: number, trimEvery?: number, now?: () => number }} [options]
- *   `trimEvery`: writes between trims, so the cap is approximate by that much and a write costs one `set`.
- */
+// Ratings in extension storage (`storage` looks like chrome.storage.local): one small entry per post,
+// trimmed every `trimEvery` writes to the most recent `max`, so the cap is approximate by that much.
 export function createCache(storage, { max = 2000, trimEvery = 50, now = () => Date.now() } = {}) {
   const PREFIX = 'ratings:v4:'; // bump when the Rating shape, signal wording or storage layout changes
   const LEGACY = 'ratings:v3'; // every rating in one object; rewriting it per post cost ~200 KB twice
@@ -109,7 +95,7 @@ export function createCache(storage, { max = 2000, trimEvery = 50, now = () => D
   let writes = 0;
   let cleaned;
 
-  /** Once per worker life: the old layout is not read, just removed. */
+  // Once per worker life: the old layout is not read, just removed.
   const clean = () => (cleaned ??= storage.remove(LEGACY));
 
   async function trim() {
@@ -138,20 +124,9 @@ export function createCache(storage, { max = 2000, trimEvery = 50, now = () => D
   };
 }
 
-/**
- * Rates posts one at a time (TypeSafe rate-limits bursts, and this runs
- * passively while scrolling). Short rate limits are waited out here; longer
- * ones are thrown with `retryAfter` so the caller can come back later.
- *
- * @param {object} deps
- * @param {import('./jev.js').JevClient} deps.jev
- * @param {ReturnType<typeof createCache>} deps.cache
- * @param {(ms: number) => Promise<void>} [deps.sleep]
- * @param {number} [deps.maxAttempts]
- * @param {number} [deps.maxWaitMs] Longest pause to sit through before giving the wait back to the caller.
- * @param {number} [deps.authPauseMs] How long a missing or rejected key is taken as read before asking again.
- * @param {() => number} [deps.now]
- */
+// Rates posts one at a time (the provider rate-limits bursts, and this runs while scrolling). Short
+// rate limits are waited out here, up to `maxWaitMs`; longer ones are thrown with `retryAfter` so the
+// caller can come back. A 401 is remembered for `authPauseMs` so a feed of posts costs one round trip.
 export function createRater({
   jev,
   cache,
@@ -198,7 +173,7 @@ export function createRater({
         onStart?.();
         return rateNow(text);
       });
-      chain = result.catch(() => {}); // one failure must not stall the queue
+      chain = result.catch(() => {}); // a rejected rating must not hold up the post behind it
       return result;
     },
     /** Forgets a remembered key failure; call when the key or provider changes. */

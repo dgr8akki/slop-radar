@@ -214,7 +214,7 @@ describe('createRater', () => {
     assert.equal((await rater.rate('second')).verdict, 'slop');
   });
 
-  it('remembers a rejected or missing key for a minute instead of asking the provider per post', async () => {
+  it('remembers a 401 for a minute', async () => {
     let now = 0;
     const jev = fakeJev(() => {
       throw new JevError('Your API key was rejected. Check it in settings.', { status: 401 });
@@ -237,7 +237,7 @@ describe('createRater', () => {
     assert.equal(jev.calls.length, 3);
   });
 
-  it("tells the caller when a post's turn comes, and skips one cancelled while it waited", async () => {
+  it('onStart and cancellation', async () => {
     const jev = fakeJev(() => slopAnswers);
     const rater = createRater({ jev, cache: createCache(memoryStorage()) });
     const order = [];

@@ -9,6 +9,7 @@
  * a post is `[componentkey^="update-card"]`, its body `[data-testid="expandable-text-box"]`.
  */
 (() => {
+  // TODO: these break every few months; last checked Sep 2026.
   const POST = '[componentkey^="update-card"]';
   const BODY = '[data-testid="expandable-text-box"]';
   const MIN_CHARS = 80; // too short to judge (reposts, one-liners)
@@ -25,7 +26,8 @@
   const POPOVER_WIDTH = 288; // minimum; the card grows for longer signal text
   const HUMAN_SIGNALS = ['Concrete first-hand details']; // SIGNALS.specific in lib/rating.js
 
-  const LABELS = { slop: 'AI slop', human: 'Human', unclear: 'Unclear', pending: 'Checking', error: 'Not rated' };
+  // The tag on a named person's post says "Reads like AI"; the popover title keeps "slop" for the pattern.
+  const LABELS = { slop: 'Reads like AI', human: 'Human', unclear: 'Unclear', pending: 'Checking', error: 'Not rated' };
   const TITLES = {
     slop: 'Reads like AI slop',
     human: 'Reads human',
@@ -34,7 +36,7 @@
     error: 'Not rated',
   };
 
-  /** One glyph per state, so the tag never relies on colour alone. 12×12 viewBox. */
+  // One glyph per state (12×12 viewBox); the shape is the cue, the colour just helps.
   const GLYPHS = {
     human: '<circle cx="6" cy="6" r="5" fill="currentColor"/>',
     unclear:
@@ -114,8 +116,10 @@
       return setTimeout(() => recheck(post), Math.min(response.retryAfter, MAX_PAUSE_S) * 1000);
     }
     if (response?.code === 'no-key' || response?.code === 'bad-key') return pause(post, response.code);
-    if (!response || response.error)
+    if (!response || response.error) {
+      post.dataset.slopRadarLength = '0'; // tried again when it scrolls back into view
       return label(post, { state: 'error', message: response?.error ?? 'Rating failed.' });
+    }
     label(post, { state: response.rating.verdict, rating: response.rating });
     // Rated: stop watching it scroll. A click on the post ("…more") brings it back for the re-rate check.
     visibility.unobserve(post);
@@ -176,7 +180,7 @@
     check(post, retried);
   }
 
-  // — No working key: one card at the top of the feed, not a "Not rated" tag on every post. —
+  // No working key: one card at the top of the feed, not a "Not rated" tag on every post.
 
   let paused = false;
   const skipped = new Set(); // posts that came into view while paused
@@ -332,7 +336,7 @@
     badge.style.right = `${post.getBoundingClientRect().right - b.left + 8}px`;
   }
 
-  // — Theme. LinkedIn's dark mode ignores the OS, so sample the card itself. —
+  // Theme. LinkedIn's dark mode ignores the OS, so sample the card itself.
 
   let dark;
   function isDark(el) {
@@ -353,33 +357,35 @@
     document.querySelectorAll('.slop-radar-post, .slop-radar-card').forEach(applyTheme);
   }).observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
 
-  // — Popover: one shared element in a shadow root on <body>, so card overflow can't clip it. —
+  // Popover: one shared element in a shadow root on <body>, so card overflow can't clip it.
 
+  // Colours come from the --slop-radar-* properties content.css puts on :root, so they live in one place.
   const POPOVER_CSS = `
     :host { all: initial; }
     .pop { position: fixed; z-index: 2147483000; min-width: ${POPOVER_WIDTH}px; max-width: min(360px, calc(100vw - 16px));
       box-sizing: border-box; padding: 14px 16px;
       display: flex; flex-direction: column; gap: 12px; text-align: left;
-      background: #f9f4ed; color: #201e1d; border-radius: 20px;
-      box-shadow: 0 12px 32px rgb(46 43 37 / 28%), 0 0 0 1px rgb(46 43 37 / 8%);
+      background: var(--slop-radar-cream); color: var(--slop-radar-ink); border-radius: 10px;
+      border: 1px solid var(--slop-radar-line); box-shadow: var(--slop-radar-shadow);
       font: 13px/1.4 system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; }
     .pop[hidden] { display: none; }
     svg { display: block; flex: none; }
-    .g-human { color: #728157; } .g-slop { color: #b2622d; } .g-unclear, .g-pending, .g-error { color: #82796a; }
+    .g-human { color: var(--slop-radar-human); } .g-slop { color: var(--slop-radar-slop); }
+    .g-unclear, .g-pending, .g-error { color: var(--slop-radar-neutral); }
     .head { display: flex; align-items: center; gap: 8px; }
     .title { font-size: 15px; font-weight: 650; letter-spacing: -0.005em; }
-    .brand { margin-left: auto; font-size: 12px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: #645c50; }
+    .brand { margin-left: auto; font-size: 12px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--slop-radar-muted); }
     .reading, .group { display: flex; flex-direction: column; gap: 6px; }
     .meter { display: flex; gap: 2px; height: 8px; }
     .meter div { flex-basis: 0; border-radius: 999px; outline: 1px solid rgb(46 43 37 / 40%); outline-offset: -1px; }
-    .nums { display: flex; justify-content: space-between; font-size: 12px; font-variant-numeric: tabular-nums; color: #645c50; }
-    .nums .h { color: #3d472b; font-weight: 600; } .nums .s { color: #643312; font-weight: 600; }
+    .nums { display: flex; justify-content: space-between; font-size: 12px; font-variant-numeric: tabular-nums; color: var(--slop-radar-muted); }
+    .nums .h { color: var(--slop-radar-human-ink); font-weight: 600; } .nums .s { color: var(--slop-radar-slop-ink); font-weight: 600; }
     .signals { display: flex; flex-direction: column; gap: 8px; }
     .group { gap: 5px; }
-    .group-title { font-size: 12px; font-weight: 600; color: #645c50; }
+    .group-title { font-size: 12px; font-weight: 600; color: var(--slop-radar-muted); }
     .sig { display: flex; align-items: center; gap: 8px; }
-    .msg { color: #474238; }
-    .foot { padding-top: 10px; border-top: 1px solid rgb(46 43 37 / 12%); font-size: 12px; color: #645c50; }
+    .msg { color: var(--slop-radar-body); }
+    .foot { padding-top: 10px; border-top: 1px solid var(--slop-radar-line); font-size: 12px; color: var(--slop-radar-muted); }
     @keyframes spin { to { transform: rotate(360deg); } }
     .slop-radar-spin { transform-origin: 6px 6px; animation: spin 1.2s linear infinite; }
     @media (prefers-reduced-motion: reduce) { .slop-radar-spin { animation: none; } }
@@ -459,9 +465,9 @@
       // One meter, both sides: human grows from the left, slop from the right.
       const meter = el('meter');
       for (const [share, color] of [
-        [human, '#8fa073'],
-        [neither, '#dcd3c4'],
-        [slop, '#d67f48'],
+        [human, 'var(--slop-radar-human-fill)'],
+        [neither, 'var(--slop-radar-neither)'],
+        [slop, 'var(--slop-radar-slop-fill)'],
       ]) {
         const seg = el('');
         Object.assign(seg.style, { flexGrow: share, minWidth: share ? '4px' : '0', background: color });
@@ -502,19 +508,12 @@
       parts.push(reading);
       if (signals.childElementCount) parts.push(signals);
     } else {
-      parts.push(
-        el(
-          'msg',
-          state === 'pending'
-            ? 'Reading this post’s text. Usually under a second, a few seconds when the provider is busy.'
-            : message,
-        ),
-      );
+      parts.push(el('msg', state === 'pending' ? 'Checking… usually under a second.' : message));
     }
 
     const foot = {
       pending: "Only the post's text is sent, never the author's name or profile.",
-      error: 'Nothing is labelled until rating works again.',
+      error: 'Labels resume automatically when rating works again.',
     };
     parts.push(el('foot', foot[state] ?? 'Judges writing style, not who wrote it.'));
     return parts;

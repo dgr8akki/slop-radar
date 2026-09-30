@@ -136,3 +136,21 @@ describe('marks on a white LinkedIn card', () => {
     assert.ok(contrast(edge['--sr-edge'], '#ffffff') >= 3, `${edge['--sr-edge']} edge`);
   });
 });
+
+describe('radii', () => {
+  it('uses one radius for containers and pills only for tags and pill-shaped controls', () => {
+    const files = [
+      '../src/ui/theme.css',
+      '../src/options/options.css',
+      '../src/popup/popup.css',
+      '../src/content/content.css',
+    ];
+    const allowed = new Set(['10px', '50%', '999px', 'var(--radius-pill)', 'inherit']);
+    for (const file of files) {
+      const css = readFileSync(new URL(file, import.meta.url), 'utf8');
+      for (const [, value] of css.matchAll(/border-radius:\s*([^;]+);/g)) {
+        assert.ok(allowed.has(value.trim()), `${file}: border-radius ${value}`);
+      }
+    }
+  });
+});

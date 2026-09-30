@@ -1,0 +1,10 @@
+{
+  "name": {
+    "message": "Slop Radar: AI writing labels",
+    "description": "Extension name, also the store title. No site names."
+  },
+  "description": {
+    "message": "Tags LinkedIn posts Human, Unclear or Reads like AI as you scroll, with the reasons on hover. Judges style, not who wrote it.",
+    "description": "Store summary, 132 characters at most."
+  }
+}

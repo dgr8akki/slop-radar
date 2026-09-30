@@ -14,7 +14,6 @@ try {
   // The page could read storage.local on this Chrome, but the worker must keep running.
 }
 
-// First install: open settings in a tab to pick a provider and connect a key.
 chrome.runtime.onInstalled.addListener(({ reason }) => {
   if (reason === 'install') chrome.runtime.openOptionsPage();
 });
@@ -40,7 +39,10 @@ async function describeFailure(error) {
   if (error.busy) return { error: error.message, retryAfter: error.retryAfter };
   if (error.status === 401) return { error: error.message, code: await authCode() };
   console.error(error);
-  return { error: error instanceof JevError ? error.message : 'Rating failed. It will be tried again later.' };
+  return {
+    error:
+      error instanceof JevError ? error.message : "Couldn't rate this one. It'll retry when it scrolls back into view.",
+  };
 }
 
 // Posts queued from tabs, so a cancel from the page can drop one that scrolled away before its turn.

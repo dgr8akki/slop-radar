@@ -1,6 +1,6 @@
 # Changelog
 
-All notable changes to this project are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses [Semantic Versioning](https://semver.org/).
+What changed in each release, newest first, in the [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) shape. Version numbers follow semver; a bump to the middle number means the store listing needs new screenshots, so those are rare. Entries under Unreleased have shipped to the repo but not yet to the store.
 
 ## [Unreleased]
 
@@ -10,6 +10,12 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ### Changed
 
+- The extension name and store summary come from `_locales` (English and British English for now), so the listing can carry English variants.
+- One corner radius on the settings page and in the popup; the popup's connection tile is now a plain line.
+- README rewritten in plain prose: what the tags mean, how it decides, and a troubleshooting table that starts from the connect card.
+- The store title is now "Slop Radar: AI writing labels" and the summary says what the tags are and that they judge style, not who wrote it.
+- The tag on a post that reads like a template now says "Reads like AI" rather than "AI slop"; the popover title still says "Reads like AI slop". Popover messages say what actually happens: "Checking… usually under a second", and labels resume on their own once rating works again.
+- Settings copy rewritten: after connecting it tells you to open the feed and scroll (no reload needed), the provider tiles say whose account they use, and the footer says plainly that the key stays local.
 - Slop Radar now requires Chrome 140 or newer, so the API key and rating cache stay out of the LinkedIn page's reach.
 - With no key, or one the provider rejects, the feed shows a single card with a Connect button instead of a "Not rated" tag on every post. Saving a key in settings picks rating up again in open LinkedIn tabs, including posts that were left unrated.
 - The feed is watched for new posts instead of polled every 1.5 seconds, nothing runs on LinkedIn pages without posts (messaging, jobs, profiles) or in a hidden tab, and rated posts are no longer tracked as they scroll.
@@ -42,14 +48,14 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ### Added
 
-- Choose your Jev provider on a new settings page: TypeSafe directly (key from the TypeSafe console) or Vercel AI Gateway. Setup steps, key link and privacy line follow the choice.
-- The settings page opens on install. A saved key is never shown again: it appears masked with Test, Replace and Remove.
-- `npm run eval` uses `TYPESAFE_API_KEY` when set, otherwise `AI_GATEWAY_API_KEY`.
+- A settings page, opened on install, where you pick who runs the model for you: TypeSafe directly, or Vercel AI Gateway. The setup steps and the privacy line change with the choice.
+- The key is masked once saved (first four and last four characters) and can be tested, replaced or removed from the same card. It is never shown in full again.
+- The live check reads `TYPESAFE_API_KEY` first and falls back to `AI_GATEWAY_API_KEY`.
 
 ### Changed
 
-- The popup no longer has a key field; it shows "Connected via …" with **Change**, or **Connect Jev** until a key is saved.
-- New host permission for `api.typesafe.ai`. Existing installs keep using Vercel until you switch.
+- The popup lost its key field. It says which provider you are connected through and offers Change, or Connect Jev while there is no key.
+- A second host permission, for `api.typesafe.ai`. Installs from 1.0.0 keep going through Vercel until you switch.
 
 ## [1.0.0] - 2026-09-25
 
