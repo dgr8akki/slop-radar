@@ -36,4 +36,13 @@ describe('manifest', () => {
   it('keeps the store description within 132 characters', () => {
     assert.ok(manifest.description.length <= 132, `${manifest.description.length} chars`);
   });
+
+  it('requires Chrome 140 and never calls setAccessLevel unguarded', () => {
+    // storage.local.setAccessLevel only exists from Chrome 140. An unguarded call
+    // throws while the module evaluates, so onMessage never registers.
+    assert.ok(Number(manifest.minimum_chrome_version) >= 140, manifest.minimum_chrome_version);
+    const background = readFileSync(new URL(manifest.background.service_worker, src), 'utf8');
+    assert.match(background, /setAccessLevel\?\.\(/);
+    assert.doesNotMatch(background, /(?<!\?\.)setAccessLevel\(/);
+  });
 });

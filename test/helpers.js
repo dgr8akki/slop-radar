@@ -10,7 +10,6 @@ export function fakeJev(respond) {
   const calls = [];
   return {
     calls,
-    secondsPaused: () => 0,
     async evaluate(body) {
       calls.push(body);
       return respond(body);
@@ -29,14 +28,20 @@ export const choice = (value, confidence = 0.95) => ({
 /** Shorthand for a Jev boolean answer. */
 export const yesNo = (probability) => ({ type: 'boolean', probability });
 
+/** A relevance answer with the given probabilities for levels 0-3. */
+export const relevance = (...probabilities) => ({
+  relevance: { type: 'score', probabilities: Object.fromEntries(probabilities.map((p, i) => [i, p])) },
+});
+
 /**
  * Exposes a jsdom page as the globals that injected page functions expect.
  *
  * @param {string} html
+ * @param {string} [url] The page's address, for code that reads `location`.
  * @returns {() => void} Restores the previous globals.
  */
-export function installDom(html) {
-  const { window } = new JSDOM(html, { url: 'https://www.linkedin.com/feed/' });
+export function installDom(html, url = 'https://example.com/') {
+  const { window } = new JSDOM(html, { url });
   window.HTMLElement.prototype.scrollIntoView = function scrollIntoView() {
     window.lastScrolledTo = this;
   };
@@ -49,6 +54,8 @@ export function installDom(html) {
     'DOMParser',
     'matchMedia',
     'innerHeight',
+    'innerWidth',
+    'getComputedStyle',
     'HTMLInputElement',
     'HTMLTextAreaElement',
     'Event',

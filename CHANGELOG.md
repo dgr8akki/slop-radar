@@ -2,14 +2,20 @@
 
 All notable changes to this project are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Changed
+
+- Slop Radar now requires Chrome 140 or newer, so the API key and rating cache stay out of the LinkedIn page's reach.
+
 ## [1.2.0] - 2026-09-28
 
 ### Changed
 
-- New look throughout. On LinkedIn, labels are small cream tags with a glyph per state (a solid seed for Human, a half seed for Unclear, a scatter of dots for AI slop). Only Human and AI slop mark the card, with a thin inset rule instead of a full outline. Tags step deeper on LinkedIn's dark theme, detected from the card itself.
+- New look throughout. On LinkedIn, labels are small cream tags with a distinct icon per state so you don't need the colour. Only Human and AI slop mark the card, with a thin inset rule instead of a full outline. Tags step deeper on LinkedIn's dark theme, detected from the card itself.
 - Hover or focus a tag for a popover instead of a browser tooltip: one meter showing both sides, signals grouped into "Pointing to slop" and "Pointing to human", and a reminder that it judges writing style, not who wrote it. Escape closes it.
 - Popup and settings page redesigned with a warm cream and terracotta theme and bundled fonts (Figtree and Caprasimo, both OFL). Settings adds a style-not-authorship note, provider cards, numbered setup steps and clearer status messages.
-- New icon: the three lines on a terracotta disc, with a sage seed.
+- New icon.
 - Cached ratings are refreshed once, since the human signal's wording changed.
 
 ## [1.1.0] - 2026-09-27
@@ -36,6 +42,7 @@ All notable changes to this project are documented here. The format follows [Kee
 - One request at a time, waiting out rate limits instead of failing.
 - Popup with a label legend and an API key check on save.
 
+[Unreleased]: https://github.com/dgr8akki/slop-radar/compare/v1.2.0...HEAD
 [1.2.0]: https://github.com/dgr8akki/slop-radar/releases/tag/v1.2.0
 [1.1.0]: https://github.com/dgr8akki/slop-radar/releases/tag/v1.1.0
 [1.0.0]: https://github.com/dgr8akki/slop-radar/releases/tag/v1.0.0

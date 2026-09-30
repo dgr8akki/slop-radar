@@ -6,7 +6,8 @@
 import { JevError, createJevClient } from './lib/jev.js';
 import { createCache, createRater } from './lib/rating.js';
 
-chrome.storage.local.setAccessLevel({ accessLevel: 'TRUSTED_CONTEXTS' });
+// Keeps storage.local away from the content script (needs Chrome 140+).
+chrome.storage.local.setAccessLevel?.({ accessLevel: 'TRUSTED_CONTEXTS' });
 
 // First install: open settings in a tab to pick a provider and connect a key.
 chrome.runtime.onInstalled.addListener(({ reason }) => {

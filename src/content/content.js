@@ -128,7 +128,7 @@
   function isDark(el) {
     for (let node = el; node; node = node.parentElement) {
       const [r, g, b, a = 1] = (getComputedStyle(node).backgroundColor.match(/[\d.]+/g) ?? []).map(Number);
-      // ponytail: plain weighted RGB, not linearised sRGB; plenty to tell LinkedIn's two themes apart.
+      // Plain weighted RGB, not linearised sRGB; plenty to tell LinkedIn's two themes apart.
       if (r !== undefined && a > 0) return (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255 < 0.2;
     }
     return false;

@@ -1,7 +1,4 @@
-/* Slop Radar tags on LinkedIn posts: small cream seed tags, a colour LinkedIn never uses.
-   Filled tag = a verdict, outlined tag = no verdict yet. Only Human and AI slop mark the card,
-   with a 3px inset rule that follows its radius and never shifts LinkedIn's layout.
-   The popup reuses these rules for its legend. */
+/* Tags on LinkedIn posts (the popup legend reuses these rules). Filled = verdict, outlined = none yet. */
 
 .slop-radar-badge {
   --sr-bg: #f9f4ed;

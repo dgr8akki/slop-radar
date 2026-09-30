@@ -65,7 +65,9 @@ function toWire(provider, questions) {
   );
 }
 
-function fromWire(answers = {}) {
+const isRecord = (value) => typeof value === 'object' && value !== null && !Array.isArray(value);
+
+function fromWire(answers) {
   return Object.fromEntries(
     Object.entries(answers).map(([name, a]) => [
       name,
@@ -77,13 +79,20 @@ function fromWire(answers = {}) {
 /** Default pause when the provider rate-limits us without a Retry-After header. */
 const DEFAULT_RETRY_AFTER_S = 30;
 
+/** Jev answers in well under a second; a provider that takes this long is stuck, and a hung request would block every later one. */
+const DEFAULT_TIMEOUT_MS = 20_000;
+
+/** Pause before the single retry of a 5xx, so a provider mid-hiccup gets a moment rather than the same request again. */
+const RETRY_DELAY_MS = 400;
+
 export class JevError extends Error {
   /**
    * @param {string} message Human-readable, safe to show in the UI.
-   * @param {{ status?: number, retryAfter?: number }} [details]
+   * @param {{ status?: number, retryAfter?: number, cause?: unknown }} [details]
+   *   `status` is the HTTP status, or 0 when no response arrived.
    */
-  constructor(message, { status = 0, retryAfter = 0 } = {}) {
-    super(message);
+  constructor(message, { status = 0, retryAfter = 0, cause } = {}) {
+    super(message, cause === undefined ? undefined : { cause });
     this.name = 'JevError';
     this.status = status;
     this.retryAfter = retryAfter;
@@ -99,7 +108,6 @@ export class JevError extends Error {
  * @typedef {object} JevClient
  * @property {(body: { state: unknown, questions: object }) => Promise<Record<string, any>>} evaluate
  *   Runs one evaluation and resolves with the `answers` object.
- * @property {() => number} secondsPaused Seconds left on a rate-limit pause (0 when free).
  */
 
 /**
@@ -108,6 +116,8 @@ export class JevError extends Error {
  * @param {() => ProviderId | Promise<ProviderId>} [options.getProvider] Unknown values fall back to Vercel.
  * @param {typeof fetch} [options.fetchImpl] Injected for tests.
  * @param {() => number} [options.now] Injected for tests.
+ * @param {number} [options.timeoutMs] How long one request may take before it fails. Injected for tests.
+ * @param {(ms: number) => Promise<void>} [options.sleep] Injected for tests.
  * @returns {JevClient}
  */
 export function createJevClient({
@@ -115,17 +125,32 @@ export function createJevClient({
   getProvider = () => DEFAULT_PROVIDER,
   fetchImpl = (...args) => fetch(...args),
   now = () => Date.now(),
+  timeoutMs = DEFAULT_TIMEOUT_MS,
+  sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
 }) {
   let pausedUntil = 0;
 
   const secondsPaused = () => Math.max(0, Math.ceil((pausedUntil - now()) / 1000));
 
-  const post = (provider, key, body) =>
-    fetchImpl(provider.endpoint, {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ model: provider.model, ...body, questions: toWire(provider, body.questions) }),
-    });
+  async function post(provider, key, body) {
+    try {
+      return await fetchImpl(provider.endpoint, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ model: provider.model, ...body, questions: toWire(provider, body.questions) }),
+        signal: AbortSignal.timeout(timeoutMs),
+      });
+    } catch (error) {
+      if (error?.name === 'TimeoutError') {
+        throw new JevError(`${provider.host} took too long to answer. Try again.`, { status: 0, cause: error });
+      }
+      // Offline, DNS failure, blocked host: fetch rejects with a TypeError the UI can't show as is.
+      throw new JevError(`Can't reach ${provider.host}. Check your connection and try again.`, {
+        status: 0,
+        cause: error,
+      });
+    }
+  }
 
   async function evaluate(body) {
     const wait = secondsPaused();
@@ -136,11 +161,25 @@ export function createJevClient({
     if (!key) throw new JevError('Add your API key in settings.', { status: 401 });
 
     let res = await post(provider, key, body);
-    // TypeSafe returns transient 5xx under load; one retry clears most of them.
-    if (res.status >= 500) res = await post(provider, key, body);
+    // TypeSafe returns transient 5xx under load; one retry after a short pause clears most of them.
+    if (res.status >= 500) {
+      await sleep(RETRY_DELAY_MS);
+      res = await post(provider, key, body);
+    }
 
-    const json = await res.json().catch(() => ({}));
-    if (res.ok) return fromWire(json.answers);
+    const json = await res.json().then(
+      (value) => (isRecord(value) ? value : {}),
+      () => ({}),
+    );
+    if (res.ok) {
+      // A proxy, captive portal or changed API can answer 200 with anything. Only a reply that
+      // answers every question counts; accepting {} once made the options pages save a dead key as working.
+      const answers = isRecord(json.answers) ? fromWire(json.answers) : null;
+      if (!answers || Object.keys(body.questions).some((name) => !isRecord(answers[name]))) {
+        throw new JevError(`Unexpected reply from ${provider.host}.`, { status: res.status });
+      }
+      return answers;
+    }
 
     if (res.status === 429) {
       const retryAfter = Number(res.headers.get('retry-after')) || DEFAULT_RETRY_AFTER_S;
@@ -157,7 +196,7 @@ export function createJevClient({
     throw new JevError(message, { status: res.status });
   }
 
-  return { evaluate, secondsPaused };
+  return { evaluate };
 }
 
 function busyError(seconds) {

@@ -9,7 +9,7 @@
 [![CI](https://github.com/dgr8akki/slop-radar/actions/workflows/ci.yml/badge.svg)](https://github.com/dgr8akki/slop-radar/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-c67139.svg)](LICENSE)
 ![Manifest V3](https://img.shields.io/badge/manifest-v3-c67139.svg)
-![Chrome 116+](https://img.shields.io/badge/chrome-116%2B-c67139.svg)
+![Chrome 140+](https://img.shields.io/badge/chrome-140%2B-c67139.svg)
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/feed-dark.png" />

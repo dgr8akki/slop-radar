@@ -5,7 +5,7 @@
   "version": "1.2.0",
   "description": "Labels LinkedIn posts as you scroll: human, unclear or AI slop, with the reasons on hover.",
   "homepage_url": "https://github.com/dgr8akki/slop-radar",
-  "minimum_chrome_version": "116",
+  "minimum_chrome_version": "140",
   "permissions": ["storage"],
   "host_permissions": ["https://ai-gateway.vercel.sh/*", "https://api.typesafe.ai/*"],
   "background": {
