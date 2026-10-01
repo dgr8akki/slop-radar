@@ -68,7 +68,7 @@ These are GitHub blob URLs on purpose; switch to the Pages site once it exists.
 
 ### Screenshots and promo images
 
-Five shots at 1280x800 (or 640x400), a 440x280 tile and a 1400x560 marquee, with captions that keep "LinkedIn" out. They live in `../screenshots/slop-radar/store/` and must be retaken against the build being uploaded: the tag wording, button colours, focus rings and the popup connection line have all changed since they were shot. Not done in this repo.
+Five shots at 1280x800 (or 640x400), a 440x280 tile and a 1400x560 marquee, with captions that keep "LinkedIn" out. They live in `../screenshots/slop-radar/store/`, retaken on 1 October 2026 on a real feed with the 1.3.0 build, with names, faces and post text that names anyone blurred. The images are kept outside this repo.
 
 ## Distribution
 
