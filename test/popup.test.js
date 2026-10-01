@@ -119,6 +119,15 @@ describe('popup markup', () => {
     assert.deepEqual(tags, ['Human', 'Unclear', 'Reads like AI']);
   });
 
+  it('sizes the legend tag column to the widest tag instead of a fixed width', () => {
+    // A fixed 76px column fit "AI slop" but not "Reads like AI", which then ran into its description.
+    const css = readFileSync(new URL('../src/popup/popup.css', import.meta.url), 'utf8');
+    const rule = (sel) => css.match(new RegExp(`(?:^|\\n)${sel.replace('.', '\\.')} \\{([^}]*)\\}`))?.[1] ?? '';
+    assert.match(rule('.legend'), /grid-template-columns: max-content 1fr/);
+    assert.match(rule('.legend li'), /grid-template-columns: subgrid/);
+    assert.doesNotMatch(css, /grid-template-columns: \d+px/);
+  });
+
   it('names the connection section with a heading screen readers can reach', () => {
     const section = document.getElementById('connection-row');
     const heading = document.getElementById(section.getAttribute('aria-labelledby'));

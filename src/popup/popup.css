@@ -30,9 +30,10 @@ main {
   line-height: 1.45;
 }
 
+/* One grid for all rows, so the tag column is as wide as the widest tag and the descriptions line up. */
 .legend {
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-columns: max-content 1fr;
   gap: 10px;
   margin: 0;
   padding: 0;
@@ -40,9 +41,9 @@ main {
 }
 
 .legend li {
+  grid-column: 1 / -1;
   display: grid;
-  grid-template-columns: 76px 1fr;
-  gap: 10px;
+  grid-template-columns: subgrid;
   align-items: center;
   font-size: 13px;
   line-height: 1.35;

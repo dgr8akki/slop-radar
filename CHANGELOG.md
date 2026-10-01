@@ -23,6 +23,7 @@ Every Slop Radar release, latest on top, written from where you'd notice the cha
 
 ### Fixed
 
+- In the popup, the "Reads like AI" tag no longer runs into its description.
 - Posts at the top of the feed get tags again. LinkedIn started serving many posts without the `update-card` key Slop Radar looked for, so it skipped them. Any item in the main feed list now counts as a post, and one that matches both is rated once. The tag also moves left of a Follow button and the hide cross as well as the "…" menu, so it stops covering them.
 - The tag on each post is now a button: tap or click it to open the popover (hover and focus still work), and it tells assistive tech whether the popover is open instead of taking a tab stop that did nothing.
 - The popover's smallest text is now 12px (was 10px), the card widens for long signal names, and the meter's segments are outlined so they don't rely on hue alone.
