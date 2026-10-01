@@ -98,6 +98,16 @@ Everything below was checked against the code in this commit. Citations name the
 Slop Radar tags posts in the user's LinkedIn feed (www.linkedin.com) as Human, Unclear or Reads like AI according to how much their writing style resembles generic AI-generated text, and explains each tag in a popover. It does nothing on any other site.
 ```
 
+### Host permission justification (the dashboard box)
+
+The dashboard has one shared box for every host, capped at 1,000 characters, so the per-host answers below don't fit as they are. This is the text that was submitted on 1 October 2026 (843/1,000). The per-host answers stay as the longer reference.
+
+```text
+www.linkedin.com: the content script runs only on this host. Once a feed post is mostly on screen it reads the post's visible body text, sends it to the service worker and adds a small tag with the verdict. It matches the whole host rather than /feed/ because LinkedIn is a single-page app, and a script tied to one path would not load when the user reaches the feed from another page. It never reads author names, profiles, comments or messages, and makes no network requests itself.
+
+api.typesafe.ai and ai-gateway.vercel.sh: two routes to the same Jev model. The service worker sends post text, with the user's own key, to whichever one the user picked in settings, and nothing to the other. Both are declared up front because the choice is made on the settings page; asking for one at runtime would add a second prompt and protect nothing.
+```
+
 ### Permission justifications
 
 `storage` (the `setAccessLevel` try block at the top of `src/background.js`; `createCache` in `src/lib/rating.js`; `sessionPauseStore` passed to `createJevClient` in `src/background.js`)
