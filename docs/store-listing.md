@@ -44,9 +44,9 @@ Chrome 140 or newer, plus an API key of your own from TypeSafe (console.typesafe
 Where it fails
 The site obfuscates its markup, so Slop Radar relies on two stable hooks. If they change, tags stop appearing until an update. The questions are written in English; other languages are rated less reliably.
 
-Not affiliated with or endorsed by LinkedIn.
 Something wrong or missing? github.com/dgr8akki/slop-radar/issues
 The code is MIT-licensed: github.com/dgr8akki/slop-radar
+Not affiliated with or endorsed by LinkedIn.
 ```
 
 (2447 chars. "LinkedIn" appears 2 times plus the linkedin.com URL, "AI slop" once in the hook, "AI writing detector" once. Keep the "It judges style, not authorship" paragraph whatever else is cut: it answers the one-star "it flagged my human post" review before it is written.)
