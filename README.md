@@ -14,7 +14,7 @@ Not affiliated with or endorsed by LinkedIn.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/feed-dark.png" />
-  <img src="docs/feed-light.png" width="520" alt="LinkedIn feed posts with Slop Radar tags: a formulaic post tagged Reads like AI with its popover open showing 86% slop and three signals, a hydrologist's field report tagged Human, a hiring post tagged Unclear, and one still Checking. The popover ends with: judges writing style, not who wrote it." />
+  <img src="docs/feed-light.png" width="520" alt="A LinkedIn feed with Slop Radar tags. Names, faces, photos and any post text that names someone are blurred. The top post is tagged Reads like AI with its popover open: 24% human, 11% neither, 65% slop, and the line &quot;Judges writing style, not who wrote it.&quot; The posts below are tagged Reads like AI too." />
 </picture>
 
 ## What the tags mean
