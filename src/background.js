@@ -21,8 +21,8 @@ chrome.runtime.onInstalled.addListener(({ reason }) => {
 const jev = createJevClient({
   getKey: async () => (await chrome.storage.local.get('apiKey')).apiKey ?? '',
   getProvider: async () => (await chrome.storage.local.get('provider')).provider,
-  // A 429 pause kept in memory would be forgotten when Chrome stops the idle worker; session storage
-  // outlives that and is cleared with the browser.
+  // Chrome kills a quiet worker after ~30 s, and a 429 pause held in memory would die with it.
+  // Session storage survives that and still empties when the browser closes.
   pauseStore: sessionPauseStore(chrome.storage.session),
 });
 const rater = createRater({ jev, cache: createCache(chrome.storage.local) });
@@ -45,9 +45,18 @@ async function describeFailure(error) {
   };
 }
 
-// Posts queued from tabs, so a cancel from the page can drop one that scrolled away before its turn.
+// Posts queued from tabs, keyed by tab, document and the page's own id, so a cancel from the page drops
+// the right one and a document that goes away (reload, navigation, closed tab) takes its queue with it:
+// its results must not land on the next page's posts, nor cost requests nobody will see.
 const queued = new Map();
-const queueKey = (sender, id) => `${sender.tab?.id}:${id}`;
+const scope = (sender) => `${sender.tab?.id}:${sender.documentId}`;
+function dropQueued(match) {
+  for (const entry of queued.values()) if (match(entry)) entry.controller.abort();
+}
+chrome.tabs.onUpdated.addListener((tabId, change) => {
+  if (change.status === 'loading') dropQueued((entry) => entry.tab === tabId);
+});
+chrome.tabs.onRemoved.addListener((tabId) => dropQueued((entry) => entry.tab === tabId));
 
 chrome.runtime.onMessage.addListener((message, sender, reply) => {
   if (message?.type === 'open-options') {
@@ -57,7 +66,11 @@ chrome.runtime.onMessage.addListener((message, sender, reply) => {
     return false;
   }
   if (message?.type === 'cancel') {
-    queued.get(queueKey(sender, message.id))?.abort();
+    queued.get(`${scope(sender)}:${message.id}`)?.controller.abort();
+    return false;
+  }
+  if (message?.type === 'cancel-all') {
+    dropQueued((entry) => entry.scope === scope(sender));
     return false;
   }
   if (message?.type !== 'rate' || typeof message.text !== 'string') return false;
@@ -72,12 +85,13 @@ chrome.runtime.onMessage.addListener((message, sender, reply) => {
     return true;
   }
 
-  // From the feed: acknowledge now, then report back over the tab as the post's turn comes and goes, so
-  // the page can time the request itself rather than the queue in front of it.
+  // From the feed: acknowledge now, then report back to that document as the post's turn comes and goes,
+  // so the page can time the request itself rather than the queue in front of it.
   const controller = new AbortController();
-  const key = queueKey(sender, message.id);
-  queued.set(key, controller);
-  const tell = (body) => chrome.tabs.sendMessage(tab, { id: message.id, ...body }).catch(() => {});
+  const key = `${scope(sender)}:${message.id}`;
+  queued.set(key, { controller, tab, scope: scope(sender) });
+  const target = sender.documentId ? { documentId: sender.documentId } : {};
+  const tell = (body) => chrome.tabs.sendMessage(tab, { id: message.id, ...body }, target).catch(() => {});
   rater
     .rate(message.text, { signal: controller.signal, onStart: () => tell({ type: 'started' }) })
     .then(

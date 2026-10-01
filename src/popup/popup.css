@@ -68,10 +68,6 @@ main {
   line-height: 1.4;
 }
 
-.connection .mark {
-  display: none;
-}
-
 .connection #connection {
   flex: 1;
   min-width: 0;

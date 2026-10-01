@@ -46,7 +46,7 @@ export const SIGNALS = {
   specific: 'Concrete first-hand details', // content.js groups this one under "Pointing to human"
 };
 
-export const VERDICT_THRESHOLD = 0.6; // one side of the scale needs this much to decide
+export const VERDICT_THRESHOLD = 0.6; // share one side must hold before the tag commits
 const SIGNAL_THRESHOLD = 0.6;
 
 /**
@@ -125,14 +125,14 @@ export function createCache(storage, { max = 2000, trimEvery = 50, now = () => D
 }
 
 // Rates posts one at a time (the provider rate-limits bursts, and this runs while scrolling). Short
-// rate limits are waited out here, up to `maxWaitMs`; longer ones are thrown with `retryAfter` so the
-// caller can come back. A 401 is remembered for `authPauseMs` so a feed of posts costs one round trip.
+// rate limits are waited out here, up to `maxWaitMs` in total per post; beyond that the error is thrown
+// with `retryAfter` so the caller can come back. A 401 is remembered for `authPauseMs` so a feed of posts costs one round trip.
 export function createRater({
   jev,
   cache,
   sleep = (ms) => new Promise((r) => setTimeout(r, ms)),
   maxAttempts = 3,
-  maxWaitMs = 20_000,
+  maxWaitMs = 8_000,
   authPauseMs = 60_000,
   now = () => Date.now(),
 }) {
@@ -143,6 +143,7 @@ export function createRater({
     const cached = await cache.get(text);
     if (cached) return cached;
     if (auth && now() < auth.until) throw auth.error;
+    let waited = 0;
     for (let attempt = 1; ; attempt += 1) {
       try {
         const rating = toRating(await jev.evaluate({ state: text, questions: QUESTIONS }));
@@ -150,10 +151,11 @@ export function createRater({
         return rating;
       } catch (error) {
         if (error.status === 401) auth = { error, until: now() + authPauseMs };
-        // Chrome stops an idle service worker after about 30 s and drops the pending reply with it, so
-        // a long pause is not slept through: the error carries retryAfter and the page asks again.
+        // Sleeping here holds up every post behind this one and the page's own clock, so the total per
+        // post is capped; past it the error carries retryAfter and the page asks again later.
         const waitMs = (error.retryAfter || 5) * 1000;
-        if (!error.busy || attempt === maxAttempts || waitMs > maxWaitMs) throw error;
+        if (!error.busy || attempt === maxAttempts || waited + waitMs > maxWaitMs) throw error;
+        waited += waitMs;
         await sleep(waitMs);
       }
     }

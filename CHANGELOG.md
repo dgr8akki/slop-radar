@@ -1,17 +1,17 @@
 # Changelog
 
-What changed in each release, newest first, in the [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) shape. Version numbers follow semver; a bump to the middle number means the store listing needs new screenshots, so those are rare. Entries under Unreleased have shipped to the repo but not yet to the store.
+Every Slop Radar release, latest on top, written from where you'd notice the change rather than where it lives in the code. Unreleased is what's on main but not yet in a store build. Versions are semver.
 
 ## [Unreleased]
 
 ### Added
 
-- A Show/Hide button next to the API key field in settings.
+- Settings can show the key while you type it: a Show/Hide button sits beside the field.
 
 ### Changed
 
-- The extension name and store summary come from `_locales` (English and British English for now), so the listing can carry English variants.
-- One corner radius on the settings page and in the popup; the popup's connection tile is now a plain line.
+- The extension name and store summary are read from `_locales`, which has English and British English for now, so the listing can carry English variants.
+- Settings and the popup share a single corner radius; the popup's connection tile is now a plain line.
 - README rewritten in plain prose: what the tags mean, how it decides, and a troubleshooting table that starts from the connect card.
 - The store title is now "Slop Radar: AI writing labels" and the summary says what the tags are and that they judge style, not who wrote it.
 - The tag on a post that reads like a template now says "Reads like AI" rather than "AI slop"; the popover title still says "Reads like AI slop". Popover messages say what actually happens: "Checking… usually under a second", and labels resume on their own once rating works again.
@@ -28,7 +28,7 @@ What changed in each release, newest first, in the [Keep a Changelog](https://ke
 - Settings: provider tiles, the radio dots, the key field border and its placeholder are drawn in colours that can be seen on the card; the chosen provider is marked in the same deeper terracotta as links.
 - Focus rings in settings and the popup are a deeper terracotta that shows clearly on the card (was under 3:1).
 - The Connect button in settings and the popup now meets WCAG AA contrast in the light theme (5.7:1, was 3:1), on hover and when pressed too.
-- After Connect or Cancel in settings, keyboard focus moves to the connection card instead of being dropped on the page.
+- After Connect or Cancel in settings, keyboard focus moves to the connection card instead of landing nowhere.
 - Settings: the key field is marked invalid when the provider rejects the key (cleared as you type), stays read-only while a check runs, and links that open a new tab say so.
 - The settings page no longer saves a key as "Key works." when the provider answers with something that isn't a Jev reply, and says when the provider was busy rather than claiming the key was checked. Being offline now reads "Can't reach <host>" instead of "Failed to fetch".
 - A provider reply in an unexpected shape, or no connection, now shows a specific message on the tag rather than "Reload to try again", and rating failures are logged in the service worker.
@@ -48,9 +48,9 @@ What changed in each release, newest first, in the [Keep a Changelog](https://ke
 
 ### Added
 
-- A settings page, opened on install, where you pick who runs the model for you: TypeSafe directly, or Vercel AI Gateway. The setup steps and the privacy line change with the choice.
+- Settings now open on install and ask who should run the model for you: TypeSafe directly, or Vercel AI Gateway. Whichever you pick, the setup steps and the privacy line follow it.
 - The key is masked once saved (first four and last four characters) and can be tested, replaced or removed from the same card. It is never shown in full again.
-- The live check reads `TYPESAFE_API_KEY` first and falls back to `AI_GATEWAY_API_KEY`.
+- The live check uses `TYPESAFE_API_KEY` when it is set, otherwise `AI_GATEWAY_API_KEY`.
 
 ### Changed
 
@@ -66,7 +66,7 @@ What changed in each release, newest first, in the [Keep a Changelog](https://ke
 - Verdicts from the summed sides of a five-level scale, with "Unclear" when neither side reaches 60%.
 - One rating per post, cached (most recent 2,000), and re-rated when "… more" reveals substantially more text.
 - One request at a time, waiting out rate limits instead of failing.
-- Popup with a label legend and an API key check on save.
+- Popup with a label legend; saving an API key tests it first.
 
 [Unreleased]: https://github.com/dgr8akki/slop-radar/compare/v1.2.0...HEAD
 [1.2.0]: https://github.com/dgr8akki/slop-radar/releases/tag/v1.2.0

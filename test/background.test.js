@@ -6,7 +6,7 @@ import { yesNo } from './helpers.js';
 
 /** A `chrome` double for the service worker: storage, runtime listeners and tabs. */
 function fakeChrome({ store = {}, tabs = [], brokenCache = false } = {}) {
-  const listeners = { onMessage: [], onChanged: [], onInstalled: [] };
+  const listeners = { onMessage: [], onChanged: [], onInstalled: [], onUpdated: [], onRemoved: [] };
   const sent = [];
   const opened = [];
   const local = {
@@ -50,11 +50,13 @@ function fakeChrome({ store = {}, tabs = [], brokenCache = false } = {}) {
       openOptionsPage: () => opened.push(Date.now()),
     },
     tabs: {
+      onUpdated: { addListener: (l) => listeners.onUpdated.push(l) },
+      onRemoved: { addListener: (l) => listeners.onRemoved.push(l) },
       async query() {
         return tabs;
       },
-      async sendMessage(id, message) {
-        sent.push({ id, message });
+      async sendMessage(id, message, options) {
+        sent.push({ id, message, options });
         if (id === 2) throw new Error('Could not establish connection. Receiving end does not exist.');
       },
     },
@@ -86,7 +88,8 @@ async function load(options) {
 }
 
 /** Sends a message the way Chrome would and resolves with { handled, reply }. */
-function send(chrome, message, sender = { tab: { id: 1 } }) {
+const FEED = { tab: { id: 1 }, documentId: 'doc-a' };
+function send(chrome, message, sender = FEED) {
   return new Promise((resolve) => {
     let replied = false;
     const handled = chrome.listeners.onMessage[0](message, sender, (reply) => {
@@ -156,6 +159,63 @@ describe('service worker', () => {
       chrome.sent.map((s) => `${s.id}:${s.message.type}:${s.message.id}`),
       ['1:started:7', '1:rated:7'],
     );
+    assert.deepEqual(chrome.sent[0].options, { documentId: 'doc-a' }, 'addressed to the document that asked');
+  });
+
+  it('keeps two documents in one tab apart, even when their ids collide', async () => {
+    const chrome = await load({ store: { apiKey: 'vck_test_key_1234567890', provider: 'vercel' } });
+    let release;
+    globalThis.fetch = () => new Promise((resolve) => (release = () => resolve(json(200, { answers: answers() }))));
+    await send(chrome, { type: 'rate', id: 1, text: `${TEXT} old page` }, { tab: { id: 1 }, documentId: 'doc-a' });
+    await send(chrome, { type: 'rate', id: 1, text: `${TEXT} new page` }, { tab: { id: 1 }, documentId: 'doc-b' });
+    await settle();
+    await send(chrome, { type: 'cancel', id: 1 }, { tab: { id: 1 }, documentId: 'doc-b' }); // only doc-b's post
+    for (let i = 0; i < 50 && !chrome.sent.some((s) => s.message.type === 'rated'); i++) {
+      release?.();
+      await settle();
+    }
+    assert.deepEqual(
+      chrome.sent.map((s) => `${s.message.type}:${s.message.id}:${s.options.documentId}`),
+      ['started:1:doc-a', 'rated:1:doc-a'],
+    );
+  });
+
+  it("drops a document's whole queue when it unloads, reloads or its tab closes", async () => {
+    const chrome = await load({ store: { apiKey: 'vck_test_key_1234567890', provider: 'vercel' } });
+    let release;
+    globalThis.fetch = () => new Promise((resolve) => (release = () => resolve(json(200, { answers: answers() }))));
+    const docA = { tab: { id: 1 }, documentId: 'doc-a' };
+    const docB = { tab: { id: 1 }, documentId: 'doc-b' };
+    const tab2 = { tab: { id: 2 }, documentId: 'doc-c' };
+    await send(chrome, { type: 'rate', id: 1, text: `${TEXT} a1` }, docA); // in flight
+    await send(chrome, { type: 'rate', id: 2, text: `${TEXT} a2` }, docA);
+    await send(chrome, { type: 'rate', id: 1, text: `${TEXT} b1` }, docB);
+    await send(chrome, { type: 'rate', id: 1, text: `${TEXT} c1` }, tab2);
+    await send(chrome, { type: 'rate', id: 2, text: `${TEXT} c2` }, tab2);
+    await settle();
+    await send(chrome, { type: 'cancel-all' }, docA); // pagehide of the old document
+    chrome.listeners.onRemoved[0](2); // tab 2 closed
+    const done = () => chrome.sent.filter((s) => s.message.type === 'rated').length;
+    for (let i = 0; i < 60 && done() < 2; i++) {
+      release?.();
+      await settle();
+    }
+    // a1 was already started so it finishes; a2 and both of tab 2 are gone; b1 runs.
+    assert.deepEqual(
+      chrome.sent.map((s) => `${s.message.type}:${s.options.documentId}:${s.message.id}`),
+      ['started:doc-a:1', 'rated:doc-a:1', 'started:doc-b:1', 'rated:doc-b:1'],
+    );
+
+    // A reload (status loading) empties the tab's queue too.
+    await send(chrome, { type: 'rate', id: 5, text: `${TEXT} b5` }, docB);
+    await send(chrome, { type: 'rate', id: 6, text: `${TEXT} b6` }, docB);
+    await settle();
+    chrome.listeners.onUpdated[0](1, { status: 'loading' });
+    for (let i = 0; i < 30; i++) {
+      release?.();
+      await settle();
+    }
+    assert.equal(chrome.sent.filter((s) => s.message.type === 'rated' && s.message.id === 6).length, 0, 'b6 dropped');
   });
 
   it('drops a queued post the page cancels before its turn', async () => {

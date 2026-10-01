@@ -171,12 +171,30 @@ describe('createRater', () => {
     let calls = 0;
     const jev = fakeJev(() => {
       calls += 1;
-      if (calls === 1) throw new JevError('busy', { status: 429, retryAfter: 12 });
+      if (calls === 1) throw new JevError('busy', { status: 429, retryAfter: 3 });
       return slopAnswers;
     });
     const rater = createRater({ jev, cache: createCache(memoryStorage()), sleep: async (ms) => waits.push(ms) });
     assert.equal((await rater.rate('post')).verdict, 'slop');
-    assert.deepEqual(waits, [12_000]);
+    assert.deepEqual(waits, [3_000]);
+  });
+
+  it('caps the total it sleeps per post, so the page can bound its own wait', async () => {
+    let calls = 0;
+    const jev = fakeJev(() => {
+      calls += 1;
+      throw new JevError('busy', { status: 429, retryAfter: 5 });
+    });
+    const waits = [];
+    const rater = createRater({
+      jev,
+      cache: createCache(memoryStorage()),
+      sleep: async (ms) => waits.push(ms),
+      maxAttempts: 5,
+    });
+    await assert.rejects(rater.rate('post'), { status: 429, retryAfter: 5 });
+    assert.deepEqual(waits, [5_000], 'a second 5 s sleep would pass 8 s in total');
+    assert.equal(calls, 2);
   });
 
   it('hands long rate limits back instead of sleeping through them in the worker', async () => {

@@ -305,7 +305,7 @@ describe('content script', () => {
     assert.equal(pop.hidden, true);
   });
 
-  it('30 s from the worker starting, not from queueing', async () => {
+  it('the reply clock runs from the worker starting, not from queueing', async () => {
     const feed = loadFeed(post('a', LONG) + post('b', LONG), () => ({ queued: true }), { runtimeId: 'abc' });
     await feed.show(feed.post('a'), feed.post('b'));
     assert.equal(feed.post('a').dataset.slopRadar, 'pending');
@@ -320,8 +320,8 @@ describe('content script', () => {
     await feed.receive({ type: 'started', id: 1 });
     assert.deepEqual(
       feed.timers.map((t) => t.ms),
-      [120_000, 30_000],
-      'the 30 s clock starts with the request',
+      [120_000, 50_000],
+      'the reply clock starts with the request',
     );
     await feed.receive({ type: 'rated', id: 1, ...rating('human') });
     assert.equal(feed.post('a').dataset.slopRadar, 'human');
@@ -332,7 +332,7 @@ describe('content script', () => {
     );
 
     await feed.receive({ type: 'started', id: 2 });
-    await feed.fire(); // 30 s pass with no answer
+    await feed.fire(); // the reply window passes with no answer
     const badge = feed.post('b').querySelector('.slop-radar-badge');
     assert.equal(badge.textContent, 'Not rated');
     assert.match(badge.getAttribute('aria-label'), /took too long/);
@@ -357,6 +357,13 @@ describe('content script', () => {
     assert.equal(feed.messages.filter((m) => m.type === 'cancel').length, 1);
     await feed.receive({ type: 'rated', id: 2, ...rating('slop') });
     assert.equal(feed.post('a').dataset.slopRadar, 'slop');
+  });
+
+  it('tells the worker to drop its queue when the page unloads', async () => {
+    const feed = loadFeed(post('a', LONG), () => ({ queued: true }), { runtimeId: 'abc' });
+    await feed.show(feed.post('a'));
+    feed.window.dispatchEvent(new feed.window.Event('pagehide'));
+    assert.deepEqual(JSON.parse(JSON.stringify(feed.messages.at(-1))), { type: 'cancel-all' });
   });
 
   it('still accepts an answer on the request itself', async () => {
@@ -598,6 +605,16 @@ describe('content script', () => {
     assert.equal(feed.messages.length, 1, 'still no rate requests');
   });
 
+  it('shows the connect card as soon as the key is removed, and stops asking', async () => {
+    const feed = loadFeed(post('a', LONG) + post('b', LONG), () => rating('human'));
+    await feed.show(feed.post('a'));
+    await feed.receive({ type: 'status', connected: false });
+    assert.match(feed.card()?.textContent ?? '', /isn't connected yet/);
+    assert.equal(feed.post('a').dataset.slopRadar, 'human', 'existing tags stay');
+    await feed.show(feed.post('b'));
+    assert.equal(feed.messages.filter((m) => m.type === 'rate').length, 1, 'no request for the new post');
+  });
+
   it('re-rates posts left as "Not rated" once the key is fixed', async () => {
     let broken = true;
     const feed = loadFeed(post('a', LONG), () => (broken ? { error: 'Rating failed.' } : rating('slop')));
@@ -618,6 +635,12 @@ describe('content script', () => {
     await feed.show(feed.post('a'), feed.post('b'));
     assert.equal(feed.post('a').dataset.slopRadar, 'pending', 'still checking, not "Not rated"');
     assert.equal(feed.post('b').dataset.slopRadar, 'pending');
+    const badge = feed.post('a').querySelector('.slop-radar-badge');
+    assert.match(badge.getAttribute('aria-label'), /The provider is busy\. Asking again in 30s\./);
+    badge.dispatchEvent(new feed.window.FocusEvent('focus'));
+    const pop = feed.window.document.getElementById('slop-radar-popover').shadowRoot.querySelector('.pop');
+    assert.equal(pop.querySelector('.msg').textContent, 'The provider is busy. Asking again in 30s.');
+    feed.window.document.dispatchEvent(new feed.window.KeyboardEvent('keydown', { key: 'Escape' }));
     assert.deepEqual(
       feed.timers.map((t) => t.ms),
       [30_000, 30_000],

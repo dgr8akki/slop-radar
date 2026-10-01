@@ -21,7 +21,9 @@
   const HIDE_GRACE_MS = 150; // lets the pointer travel from the tag into the popover
   const RETRY_MS = 1000; // a worker woken by the message sometimes drops that first reply
   const MAX_PAUSE_S = 60; // longest the page waits on a provider pause before asking again
-  const REPLY_TIMEOUT_MS = 30_000; // from the worker starting the request; it gives up on the provider at 20 s
+  // From the worker starting the request. Its worst case is one 20 s provider timeout, a 5xx retry of up
+  // to 20 s more, and at most 8 s of rate-limit sleeps: about 48 s. Anything past this is a stuck worker.
+  const REPLY_TIMEOUT_MS = 50_000;
   const QUEUE_TIMEOUT_MS = 120_000; // from queueing; only a worker that died mid-queue takes this long
   const POPOVER_WIDTH = 288; // minimum; the card grows for longer signal text
   const HUMAN_SIGNALS = ['Concrete first-hand details']; // SIGNALS.specific in lib/rating.js
@@ -113,7 +115,9 @@
       return label(post, { state: 'error', message: "Slop Radar didn't answer. Scroll past and back to try again." });
     }
     if (response?.retryAfter) {
-      return setTimeout(() => recheck(post), Math.min(response.retryAfter, MAX_PAUSE_S) * 1000);
+      const wait = Math.min(response.retryAfter, MAX_PAUSE_S);
+      label(post, { state: 'pending', message: `The provider is busy. Asking again in ${wait}s.` });
+      return setTimeout(() => recheck(post), wait * 1000);
     }
     if (response?.code === 'no-key' || response?.code === 'bad-key') return pause(post, response.code);
     if (!response || response.error) {
@@ -167,6 +171,11 @@
       });
     });
   }
+
+  // The page is going away: whatever is still queued would be paid for and shown to nobody.
+  addEventListener('pagehide', () => {
+    if (pending.size) chrome.runtime.sendMessage({ type: 'cancel-all' }).catch(() => {});
+  });
 
   /** A post scrolled out before the worker got to it: no point rating what nobody is looking at. */
   function left(post) {
@@ -263,15 +272,18 @@
     if (message?.type === 'started') return pending.get(message.id)?.start();
     if (message?.type === 'rated') return pending.get(message.id)?.finish(message);
     if (message?.type !== 'status') return;
-    if (message.connected) resume();
-    else paused = true;
+    if (message.connected) return resume();
+    // The key was removed in settings: stop asking, and say so once at the top of the feed.
+    paused = true;
+    const first = document.querySelector(POST);
+    if (first && !card && !dismissed) showCard(first, 'no-key');
   });
 
   const pct = (p) => Math.round(p * 100);
 
   /** What screen readers hear; the popover shows the same thing visually. */
   function describe({ state, rating, message }) {
-    if (state === 'pending') return 'Checking this post.';
+    if (state === 'pending') return message ? `Checking this post. ${message}` : 'Checking this post.';
     if (state === 'error') return `Not rated. ${message}`;
     const signals = rating.signals.length ? `Signals: ${rating.signals.join(', ')}.` : 'No strong signals.';
     return `${LABELS[state]}: ${pct(rating.slop)}% slop, ${pct(rating.human)}% human. ${signals}`;
@@ -508,7 +520,7 @@
       parts.push(reading);
       if (signals.childElementCount) parts.push(signals);
     } else {
-      parts.push(el('msg', state === 'pending' ? 'Checking… usually under a second.' : message));
+      parts.push(el('msg', state === 'pending' ? (message ?? 'Checking… usually under a second.') : message));
     }
 
     const foot = {
