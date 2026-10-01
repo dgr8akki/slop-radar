@@ -5,12 +5,17 @@
  *
  * Content scripts can't be ES modules, so this file is self-contained.
  *
- * LinkedIn's 2026 markup obfuscates class names. Only two stable hooks are used:
- * a post is `[componentkey^="update-card"]`, its body `[data-testid="expandable-text-box"]`.
+ * LinkedIn's 2026 markup obfuscates class names. Only two stable hooks are used: a post is
+ * `[componentkey^="update-card"]` or a list item in `[data-testid="mainFeed"]`, and its body is
+ * `[data-testid="expandable-text-box"]`.
  */
 (() => {
-  // TODO: these break every few months; last checked Sep 2026.
-  const POST = '[componentkey^="update-card"]';
+  // TODO: these break every few months; last checked Oct 2026. Posts now come in two shapes. Some
+  // list items in the main feed carry an update-card key, and many carry `componentkey="expanded…"`
+  // instead, so any list item in the main feed counts as a post. Both start with a display: contents
+  // wrapper, which has no box for the IntersectionObserver to see, so the list item is what gets
+  // watched and tagged. If one shape is nested in the other, the outer one is the post.
+  const POST = '[componentkey^="update-card"], [data-testid="mainFeed"] [role="listitem"]';
   const BODY = '[data-testid="expandable-text-box"]';
   const MIN_CHARS = 80; // too short to judge (reposts, one-liners)
   const REGROW = 1.3; // re-rate when "… more" reveals 30% more text
@@ -73,7 +78,7 @@
     scanTimer = undefined;
     if (document.hidden || !FEED_ROUTE.test(location.pathname)) return;
     for (const post of document.querySelectorAll(POST)) {
-      if (observed.has(post)) continue;
+      if (observed.has(post) || post.parentElement?.closest(POST)) continue;
       observed.add(post);
       visibility.observe(post);
     }
@@ -254,9 +259,12 @@
     });
     card.append(text, connect, dismiss);
     applyTheme(card);
-    const first = document.querySelector(POST) ?? post;
+    const first = firstPost() ?? post;
     first.parentElement.insertBefore(card, first);
   }
+
+  /** The top post with text, so the card goes above it and not above the share box. */
+  const firstPost = () => [...document.querySelectorAll(POST)].find((el) => el.querySelector(BODY));
 
   /** A key was saved: rate what was skipped, and anything left as "Not rated". */
   function resume() {
@@ -275,7 +283,7 @@
     if (message.connected) return resume();
     // The key was removed in settings: stop asking, and say so once at the top of the feed.
     paused = true;
-    const first = document.querySelector(POST);
+    const first = firstPost();
     if (first && !card && !dismissed) showCard(first, 'no-key');
   });
 
@@ -335,17 +343,47 @@
 
   /**
    * The tag sits top-right, left of where LinkedIn's "…" menu usually is. Cards vary (Follow buttons,
-   * wider menus), so measure the header's right-most control once and move further left if they meet.
+   * a hide cross, wider menus), so measure the controls at the right end of the header once and move
+   * the tag left of all of them if they meet. A header with no buttons falls back to its last child.
    */
   function placeBadge(post, badge) {
-    const header = [...post.children].find((el) => el !== badge && !el.matches(BODY) && !el.querySelector(BODY));
-    const control = header?.lastElementChild;
-    if (!control) return;
+    const row = header(post, badge);
+    if (!row) return;
+    const controls = [];
+    for (const el of [...row.children].reverse()) {
+      const button = el.matches('button') ? el : el.querySelector('button');
+      if (!button) break;
+      controls.push(button.getBoundingClientRect()); // a display: contents wrapper has no box; its button does
+    }
+    if (!controls.length && row.lastElementChild) controls.push(row.lastElementChild.getBoundingClientRect());
     const a = badge.getBoundingClientRect();
-    const b = control.getBoundingClientRect();
+    const boxes = controls.filter((b) => b.width);
+    if (!a.width || !boxes.length) return;
+    const b = {
+      left: Math.min(...boxes.map((r) => r.left)),
+      right: Math.max(...boxes.map((r) => r.right)),
+      top: Math.min(...boxes.map((r) => r.top)),
+      bottom: Math.max(...boxes.map((r) => r.bottom)),
+    };
     const apart = a.right <= b.left || a.left >= b.right || a.bottom <= b.top || a.top >= b.bottom;
-    if (!a.width || !b.width || apart) return;
+    if (apart) return;
     badge.style.right = `${post.getBoundingClientRect().right - b.left + 8}px`;
+  }
+
+  /**
+   * The header is the first row above the body's branch, at the closest level that has one. Older
+   * cards put it straight under the post; the new feed nests it beside the body, after an empty h2.
+   */
+  function header(post, badge) {
+    const body = post.querySelector(BODY);
+    if (!body) return undefined;
+    for (let branch = body; branch !== post; branch = branch.parentElement) {
+      for (const el of branch.parentElement.children) {
+        if (el === branch) break;
+        if (el !== badge && el.lastElementChild && !/^H\d$/.test(el.tagName)) return el;
+      }
+    }
+    return undefined;
   }
 
   // Theme. LinkedIn's dark mode ignores the OS, so sample the card itself.

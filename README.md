@@ -75,7 +75,7 @@ Every rating runs on your key, so the bill is yours, not mine. At [TypeSafe's](h
 | A Checking tag says the provider is busy                   | The provider is rate-limiting. The tag says when it will ask again; carry on scrolling.                 |
 | Short posts have no tag                                    | Posts under 80 characters are too short to judge.                                                       |
 
-Rates the text visible before "…more"; expanding a post triggers a new rating once the text grows by 30%. Relies on two LinkedIn markup hooks (`componentkey="update-card…"` and `data-testid="expandable-text-box"`), so if LinkedIn changes them, tags stop appearing until an update. The questions are written in English, and posts in other languages are rated less reliably.
+Rates the text visible before "…more"; expanding a post triggers a new rating once the text grows by 30%. Relies on two LinkedIn markup hooks: a post is a list item in the main feed or a `componentkey="update-card…"` element, and its text is `data-testid="expandable-text-box"`. If LinkedIn changes them, tags stop appearing until an update. The questions are written in English, and posts in other languages are rated less reliably.
 
 ## The four permissions
 

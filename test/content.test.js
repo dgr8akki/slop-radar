@@ -652,3 +652,143 @@ describe('content script', () => {
     assert.equal(feed.post('b').dataset.slopRadar, 'slop');
   });
 });
+
+/**
+ * LinkedIn's October 2026 feed: each post is a list item in the main feed list. Many carry no
+ * update-card key at all; the rest have it on the same list item. The first child is a
+ * display: contents wrapper, so it has no box, and the header sits two levels down next to the body.
+ */
+const item = (key, text, { card = false } = {}) =>
+  `<div role="listitem" componentkey="${card ? 'update-card-focus' : 'expanded'}${key}">` +
+  '<div data-view-name="feed-full-update" data-display-contents="true" style="display: contents">' +
+  `<div componentkey="${key}"><h2><span>Feed post</span></h2>` +
+  '<div><div><span>Author</span></div><button type="button" class="menu">More</button></div>' +
+  `<p data-view-name="feed-commentary"><span data-testid="expandable-text-box">${text}</span></p>` +
+  '</div></div></div>';
+const mainFeed = (...items) => `<div role="list" data-testid="mainFeed">${items.join('')}</div>`;
+const shareBox = '<div role="listitem"><div><button type="button">Start a post</button></div></div>';
+
+describe('content script on the October 2026 feed markup', () => {
+  const byKey = (feed, key) => feed.window.document.querySelector(`[componentkey$="${key}"][role="listitem"]`);
+
+  it('rates a post that has no update-card key', async () => {
+    const feed = loadFeed(mainFeed(item('a', LONG)), () => rating('slop'));
+    const a = byKey(feed, 'a');
+    assert.equal(feed.observed.length, 1);
+    assert.equal(feed.observed[0], a);
+    await feed.show(a);
+    assert.deepEqual(JSON.parse(JSON.stringify(feed.messages)), [{ type: 'rate', id: 1, text: LONG }]);
+    assert.equal(a.dataset.slopRadar, 'slop');
+    assert.ok(a.querySelector(':scope > .slop-radar-badge'), 'the tag sits on the list item');
+  });
+
+  it('still rates update-card posts outside the main feed list', async () => {
+    const feed = loadFeed(post('old', LONG) + mainFeed(item('new', LONG)), () => rating('human'));
+    assert.equal(feed.observed.length, 2);
+    assert.equal(feed.observed[0], feed.post('old'));
+    assert.equal(feed.observed[1], byKey(feed, 'new'));
+    await feed.show(...feed.observed);
+    assert.equal(feed.window.document.querySelectorAll('.slop-radar-badge').length, 2);
+  });
+
+  it('rates a post matched by both hooks once, with one tag', async () => {
+    const feed = loadFeed(mainFeed(item('a', LONG, { card: true })), () => rating('human'));
+    assert.equal(feed.observed.length, 1);
+    await feed.show(feed.observed[0]);
+    assert.equal(feed.messages.filter((m) => m.type === 'rate').length, 1);
+    assert.equal(feed.window.document.querySelectorAll('.slop-radar-badge').length, 1);
+  });
+
+  it('watches only the outer post when one hook sits inside the other', async () => {
+    const nested =
+      `<div role="list" data-testid="mainFeed"><div role="listitem">` +
+      `<div componentkey="update-card-inner"><div><span>Author</span></div>` +
+      `<p data-testid="expandable-text-box">${LONG}</p></div></div></div>`;
+    const feed = loadFeed(nested, () => rating('human'));
+    const outer = feed.window.document.querySelector('[role="listitem"]');
+    assert.equal(feed.observed.length, 1);
+    assert.equal(feed.observed[0], outer);
+    await feed.show(outer);
+    assert.equal(feed.window.document.querySelectorAll('.slop-radar-badge').length, 1);
+  });
+
+  it('observes the list item, never its display: contents wrapper', () => {
+    const feed = loadFeed(mainFeed(item('a', LONG), item('b', LONG, { card: true })), () => rating('human'));
+    assert.equal(feed.observed.length, 2);
+    for (const el of feed.observed) {
+      assert.equal(el.getAttribute('role'), 'listitem');
+      assert.equal(el.dataset.displayContents, undefined);
+    }
+  });
+
+  it('finds the header beside the body and keeps the tag clear of its right-hand control', async () => {
+    const feed = loadFeed(mainFeed(item('a', LONG)), () => rating('human'));
+    const rect = (left, right, top, bottom) => ({
+      left,
+      right,
+      top,
+      bottom,
+      width: right - left,
+      height: bottom - top,
+    });
+    feed.window.Element.prototype.getBoundingClientRect = function () {
+      if (this.classList.contains('slop-radar-badge')) return rect(400, 470, 8, 32);
+      if (this.classList.contains('menu')) return rect(430, 460, 4, 28); // the "…" menu
+      return rect(0, 555, 0, 300);
+    };
+    const a = byKey(feed, 'a');
+    await feed.show(a);
+    assert.equal(a.querySelector('.slop-radar-badge').style.right, '133px', 'post right 555 - control left 430 + 8');
+  });
+
+  it('moves the tag left of every control at the end of the header row: Follow, the menu and the cross', async () => {
+    const row =
+      '<div><div><span>Author</span></div>' +
+      '<div data-display-contents="true" style="display: contents"><button type="button" class="follow">Follow</button></div>' +
+      '<button type="button" class="menu">More</button><button type="button" class="hide">Hide</button></div>';
+    const feed = loadFeed(
+      mainFeed(item('a', LONG).replace(/<div><div><span>Author<\/span><\/div>.*?<\/button><\/div>/, row)),
+      () => rating('human'),
+    );
+    const rect = (left, right, top, bottom) => ({
+      left,
+      right,
+      top,
+      bottom,
+      width: right - left,
+      height: bottom - top,
+    });
+    const boxes = { follow: [300, 360], menu: [380, 410], hide: [420, 450] };
+    feed.window.Element.prototype.getBoundingClientRect = function () {
+      if (this.classList.contains('slop-radar-badge')) return rect(400, 470, 8, 32);
+      const box = boxes[this.className];
+      if (box) return rect(...box, 4, 28);
+      if (this.dataset.displayContents) return rect(0, 0, 0, 0); // no box of its own
+      return rect(0, 555, 0, 300);
+    };
+    const a = byKey(feed, 'a');
+    assert.ok(a.querySelector('.follow'), 'fixture has the Follow button');
+    await feed.show(a);
+    assert.equal(a.querySelector('.slop-radar-badge').style.right, '263px', 'post right 555 - Follow left 300 + 8');
+  });
+
+  it('puts the connect card above the first post, not above the share box', async () => {
+    const feed = loadFeed(mainFeed(shareBox, item('a', LONG)), (message) =>
+      message.type === 'rate' ? { error: 'Add your API key in settings.', code: 'no-key' } : {},
+    );
+    const a = byKey(feed, 'a');
+    await feed.show(a);
+    assert.equal(feed.card()?.nextElementSibling, a);
+  });
+
+  it('hides the popover when the feed scrolls inside its own container', async () => {
+    const feed = loadFeed(mainFeed(item('a', LONG)), () => rating('human'));
+    const a = byKey(feed, 'a');
+    await feed.show(a);
+    a.querySelector('.slop-radar-badge').click(); // pinned
+    const pop = feed.window.document.getElementById('slop-radar-popover').shadowRoot.querySelector('.pop');
+    assert.equal(pop.hidden, false);
+    feed.window.document.querySelector('main').dispatchEvent(new feed.window.Event('scroll')); // does not bubble
+    assert.equal(pop.hidden, true);
+  });
+});
