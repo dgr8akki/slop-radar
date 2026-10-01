@@ -3,7 +3,7 @@
   "default_locale": "en",
   "name": "__MSG_name__",
   "short_name": "Slop Radar",
-  "version": "1.2.0",
+  "version": "1.3.0",
   "description": "__MSG_description__",
   "homepage_url": "https://github.com/dgr8akki/slop-radar",
   "minimum_chrome_version": "140",

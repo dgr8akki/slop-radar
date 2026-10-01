@@ -1,6 +1,6 @@
 {
   "name": "slop-radar",
-  "version": "1.2.0",
+  "version": "1.3.0",
   "private": true,
   "description": "Chrome extension that tags posts in your LinkedIn feed by how much they read like generic AI writing.",
   "type": "module",

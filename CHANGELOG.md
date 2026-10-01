@@ -2,7 +2,7 @@
 
 Every Slop Radar release, latest on top, written from where you'd notice the change rather than where it lives in the code. Unreleased is what's on main but not yet in a store build. Versions are semver.
 
-## [Unreleased]
+## [1.3.0] - 2026-10-01
 
 ### Added
 
@@ -20,6 +20,7 @@ Every Slop Radar release, latest on top, written from where you'd notice the cha
 - With no key, or one the provider rejects, the feed shows a single card with a Connect button instead of a "Not rated" tag on every post. Saving a key in settings picks rating up again in open LinkedIn tabs, including posts that were left unrated.
 - The feed is watched for new posts instead of polled every 1.5 seconds, nothing runs on LinkedIn pages without posts (messaging, jobs, profiles) or in a hidden tab, and rated posts are no longer tracked as they scroll.
 - Ratings are cached one entry per post instead of one large object rewritten on every rating, and trimmed in batches. Existing cached ratings are cleared once.
+- The popup legend is one short phrase per tag.
 
 ### Fixed
 
@@ -35,6 +36,13 @@ Every Slop Radar release, latest on top, written from where you'd notice the cha
 - The settings page no longer saves a key as "Key works." when the provider answers with something that isn't a Jev reply, and says when the provider was busy rather than claiming the key was checked. Being offline now reads "Can't reach <host>" instead of "Failed to fetch".
 - A provider reply in an unexpected shape, or no connection, now shows a specific message on the tag rather than "Reload to try again", and rating failures are logged in the service worker.
 - Long provider pauses are waited out on the page instead of inside the service worker, which Chrome stops after 30 seconds; tags no longer end up as "Not rated" or ask for a reload when the worker was simply asleep.
+- While the provider is rate limiting, a waiting tag says the provider is busy and when it will ask again.
+- A tag whose rating never comes back stops at "Checking" after 30 seconds, says it took too long and asks again when the post scrolls back into view. Scrolling fast past a lot of posts no longer times out the ones still waiting their turn.
+- After reloading a LinkedIn tab, ratings meant for the old page no longer land on the new page's posts.
+- Removing the key brings up the connect card on the feed straight away. It used to need a reload.
+- Clicking a tag while the pointer is over it keeps the popover open instead of closing it.
+- Two different posts can no longer end up sharing one cached verdict.
+- On a dark system theme the popup no longer flashes light before it draws.
 
 ## [1.2.0] - 2026-09-28
 
@@ -70,7 +78,7 @@ Every Slop Radar release, latest on top, written from where you'd notice the cha
 - One request at a time, waiting out rate limits instead of failing.
 - Popup with a label legend; saving an API key tests it first.
 
-[Unreleased]: https://github.com/dgr8akki/slop-radar/compare/v1.2.0...HEAD
+[1.3.0]: https://github.com/dgr8akki/slop-radar/releases/tag/v1.3.0
 [1.2.0]: https://github.com/dgr8akki/slop-radar/releases/tag/v1.2.0
 [1.1.0]: https://github.com/dgr8akki/slop-radar/releases/tag/v1.1.0
 [1.0.0]: https://github.com/dgr8akki/slop-radar/releases/tag/v1.0.0
